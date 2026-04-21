@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment / secrets — never commit
+.env
+.env.local
+.env.*.local
+
+# Onboarding state (created by /borderless-onboard, resume-only)
+.borderless-onboard.json
+
+# Claude Code local settings (per-user, not shared)
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp

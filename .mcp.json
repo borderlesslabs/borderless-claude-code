@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/mcp.json",
+  "_comment_": "MCP server config for Claude Code when integrating with Borderless. Copy to .mcp.json at the root of your project. The fetch server lets Claude pull docs pages and llms.txt on demand. If you have an OpenAPI-to-MCP bridge configured, add that server here too to expose the Borderless API as callable tools during development against sandbox.",
+
+  "mcpServers": {
+    "fetch": {
+      "_description_": "Lets Claude fetch pages from docs.borderless.xyz. The Borderless docs are Mintlify-hosted, so every page has a .md variant and the llms.txt / llms-full.txt index files are available at the root.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch"]
+    },
+
+    "_borderless_api_example_": {
+      "_description_": "OPTIONAL. If you run an OpenAPI-to-MCP bridge server against the Borderless OpenAPI spec, it can expose each endpoint as a callable tool. This lets Claude Code make real sandbox API calls during development. Uncomment and configure when ready. The Borderless OpenAPI spec is at https://sandbox-api.borderless.xyz/v1/api-json. DO NOT expose production credentials to an MCP server — use sandbox only.",
+      "command": "uvx",
+      "args": [
+        "openapi-mcp-server",
+        "--spec", "https://sandbox-api.borderless.xyz/v1/api-json",
+        "--base-url", "https://sandbox-api.borderless.xyz/v1"
+      ],
+      "env": {
+        "BEARER_TOKEN_SOURCE": "oauth2",
+        "OAUTH_TOKEN_URL": "https://sandbox-api.borderless.xyz/v1/auth/m2m/token",
+        "OAUTH_CLIENT_ID": "${BORDERLESS_CLIENT_ID}",
+        "OAUTH_CLIENT_SECRET": "${BORDERLESS_CLIENT_SECRET}"
+      }
+    }
+  }
+}
