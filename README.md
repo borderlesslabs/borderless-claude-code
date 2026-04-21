@@ -26,71 +26,13 @@ Seven steps, driven by Claude. You answer a few yes/no questions; Claude does th
 
 1. **Environment check** — creates `.env` if missing, prompts for `BORDERLESS_CLIENT_ID` and `BORDERLESS_CLIENT_SECRET`.
 2. **Authenticate** — `POST /auth/m2m/token`. Proves your credentials before anything else.
-3. **Pick a corridor** — defaults to Bridge US/USD/ACH → USDC on Polygon. Customizable; `/borderless-coverage` shows alternatives.
-4. **Identity + compliance** — creates a Personal identity with placeholder PII, discovers the compliance slug for the corridor, handles ToS acceptance if the PFI requires it, starts the KYC check, polls to terminal.
+3. **Pick a corridor** — a `{country, fiat, asset, paymentMethod}` tuple. Claude proposes a default based on what your org has configured; change it to any of the other options. Run `/borderless-coverage` to see the full list.
+4. **Identity + compliance** — creates a Personal identity with placeholder PII, discovers the compliance slug for the corridor, handles Terms-of-Service acceptance if the partner requires it, starts the KYC check, polls to terminal.
 5. **Account** — creates a Standalone account with the corridor's stablecoin attached. (Production wallets — Fireblocks, Utila, Dfns, Circle — swap in via their own account-creation flows.)
-6. **Deposit** — shows a quote, creates the deposit, polls until the PFI returns payment instructions, prints them verbatim for the originator.
+6. **Deposit** — shows a quote, creates the deposit, polls until the returned payment instructions populate, prints them verbatim for the originator.
 7. **Persist state** — writes IDs to `.borderless-onboard.json` so you can resume idempotently if anything times out.
 
-### Sample output
-
-Abridged from a real sandbox run — IDs are real CUIDs from that session; PII and secrets are redacted in the actual output, not here:
-
-```
-Step 1 — Environment check
-✓ .env present; credentials loaded.
-
-Step 2 — Authenticate
-  POST /auth/m2m/token → HTTP 201
-✓ Authenticated. Token expires in ~86399s.
-
-Step 3 — PFI + corridor
-  Configured PFIs (default set): Bridge, Bitso, Yellowcard, Trace Finance, …
-  Default corridor for Bridge: US / USD / ACH → USDC on Polygon. [enter to accept]
-
-Step 4 — Identity + compliance
-  Created identity cmo8wpdk204a722p9o9au0viv
-  Compliance slug: compliance-fee5483c
-    requiredDocuments: none for this corridor
-  ✓ ToS already accepted.
-  Started compliance check. Polling for terminal status…
-    compliance: NotStarted → Started → UnderReview → Approved
-  ✓ Compliance Approved.
-
-Step 5 — Account
-  Created Standalone account cmo8x8owd04ae22p9x4lkp521 with USDC_POLYGON attached.
-    fromAddress: 0x742d35cc6634c0532925a3b844bc454e4438f44e
-
-Step 6 — Deposit
-  Quote for 10 USD: ~10 USDC_POLYGON, fee ~0.
-  Created deposit cmo8x9s5d04ag22p9xxf102ll (Bridge, Submitted).
-    status=Submitted   instructions=null
-    status=Pending     instructions=yes   depositInstruction=yes
-  ✓ Instructions populated.
-
-  Payment instructions (the originator would follow these verbatim):
-    paymentMethod:        ACH
-    bankName:              Bank of Nowhere
-    bankAccountNumber:     11223344556677
-    bankRoutingNumber:     123456789
-    bankBeneficiaryName:   Bridge Ventures Inc
-    depositMessage:        BRGMJCCUVSYUAPPYT5RK
-
-  (In sandbox you don't need to actually send fiat — the transaction
-   progresses to Completed on its own shortly.)
-
-Step 7 — Next steps
-✓ Onboarding complete.
-  - Identity:     cmo8wpdk204a722p9o9au0viv
-  - Compliance:   compliance-fee5483c (Approved)
-  - Account:      cmo8x8owd04ae22p9x4lkp521
-  - From address: 0x742d35cc6634c0532925a3b844bc454e4438f44e
-  - Deposit:      cmo8x9s5d04ag22p9xxf102ll (Completed)
-
-  IDs persisted to .borderless-onboard.json.
-```
-
-In sandbox, deposits auto-reconcile without real fiat — the transaction walks through `Submitted → Pending → Processing → Completed` on its own over a few minutes. Check https://sandbox-dashboard.borderless.xyz to see it land.
+In sandbox, deposits auto-reconcile without real fiat — the transaction walks through `Submitted → Pending → Processing → Completed` on its own over a few minutes. Check the [sandbox dashboard](https://sandbox-dashboard.borderless.xyz) to see it land.
 
 ## See what corridors are available — `/borderless-coverage`
 
