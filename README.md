@@ -67,12 +67,29 @@ Legend: D = deposit supported, W = withdrawal supported
 
 Flag column tells you at a glance: `[D/W]` = both directions, `[D  ]` = deposit-only, `[  W]` = withdrawal-only. Withdrawal coverage is typically ~2× deposit coverage on a provisioned org.
 
+## Flows covered
+
+The toolbox auto-loads context for the six core Borderless flows. Each has a dedicated skill under `.claude/skills/` that Claude reads when you ask about that area — so prompts like *"add a payout to PIX"* or *"set up a recurring USDC funding account"* trigger the right context automatically.
+
+| Flow | When to use | Skill |
+|---|---|---|
+| **Compliance** | Onboard a personal or business identity, run KYC/KYB for a corridor, handle ToS acceptance, upload documents | `borderless-compliance-flow` |
+| **Deposit** (on-ramp) | One-off fiat → stablecoin transfers via ACH, Wire, PIX, SPEI, etc. | `borderless-deposit-flow` |
+| **Withdrawal** (off-ramp) | Stablecoin → fiat to a customer's bank account. Includes the per-corridor `details` table covering 18+ corridors and the seven `details` DTO variants | `borderless-withdrawal-flow` |
+| **Virtual accounts** | Dedicated, named bank accounts that auto-convert any incoming fiat to stablecoin — recurring deposits, payroll funding, treasury, per-customer attribution | `borderless-virtual-account-flow` |
+| **Exchange** | Internal asset/fiat conversion inside a PFI account (asset↔asset, asset↔fiat, fiat↔fiat) without a deposit or withdrawal | `borderless-exchange-flow` |
+| **Webhooks** | Signed event delivery: signature verification (TS/Python/Go), idempotency on event `id`, auto-disable handling, the `WebhookEventEntity` delivery log | `borderless-webhook-verifier` |
+
+Operational reference content lives under `cookbook/`: the **error catalog** (every common sync 4xx and async PFI failure mapped to cause and fix, plus the full `TransactionStatus` and `ComplianceStatus` enums), the **sandbox-to-production checklist**, **reconciliation** (including the `/reconciliation/items` and `/orphaned-transactions` endpoints), webhook replay, amount-handling rules, and local compliance testing.
+
 ## Typical customer workflow
 
 1. **Prove everything works: `/borderless-onboard`.** One command, ~15 minutes, takes you from zero credentials to a completed sandbox deposit. See the walkthrough above.
 2. **Map the terrain: `/borderless-coverage`.** See every corridor your org has configured. Pick the one your product needs. If something you need isn't listed, email `support@borderless.xyz`.
 3. **Fork an example.** The five runnable projects under `examples/` chain in order — `compliance-personal/` → `account-setup/` → `deposit-us-ach-to-usdc/` → `withdrawal-usdc-to-us-ach/`, plus a standalone `webhooks/` Express handler. Each has a `FORK HERE` comment on the corridor constant — change it to match your chosen corridor and you're off.
 4. **Move the toolbox into your app: `/borderless-install-into <path>`.** When you're ready to build the real integration, this command copies `CLAUDE.md`, the skills, and the flow commands into your own codebase. Claude then has the Borderless guardrails and mental model baked into every session you run inside your project. The runnable examples stay here in this repo as reference.
+5. **Audit before you ship: `/borderless-lint` and the `borderless-integration-reviewer` agent.** The lint command sweeps for the common anti-patterns (missing idempotency keys, hardcoded URLs, unverified webhook handlers, float arithmetic on amounts, leaked secrets). The reviewer agent does a Borderless-specific PR audit prioritized for fund-safety and webhook-verification issues — invoke it on your branch before merging anything that touches payments.
+6. **Cut over to production.** Walk `cookbook/sandbox-to-production.md` end-to-end before flipping credentials — endpoints are identical between sandbox and production, but compliance, document validation, transaction limits, and PFI routing all change. When something fails in production, `cookbook/error-catalog.md` maps every common sync error and async `pfiErrorMessage` to its cause and fix.
 
 ## Prerequisites
 
