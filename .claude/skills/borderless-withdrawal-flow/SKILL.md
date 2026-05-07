@@ -14,12 +14,47 @@ This has **one more step than a deposit** because you must tell the PFI where th
 ## The flow
 
 ```
+0. Discover the corridor          → GET  /withdrawals/options + /withdrawals/institutions   (run before building the PI)
 (optional) Get quote              → GET  /withdrawals/quotes
 1. Create payment instruction     → POST /identities/{id}/payment-instructions   → returns paymentInstructionId
 2. Create withdrawal              → POST /withdrawals                             → returns on-chain instructions (deposit address)
 3. Send stablecoin on-chain       → out-of-band, from the account's wallet       (exact amount, exact fromAddress, exact toAddress)
 4. PFI releases fiat              → webhook: Transaction_Updated → status: Completed
 ```
+
+## 0. Discover the corridor first
+
+**Always discover before creating a payment instruction.** Never hardcode payment methods, bank slugs, or asset identifiers — they vary by corridor and the PFI behind a corridor can change without notice.
+
+Two calls — neither is optional:
+
+```bash
+GET /withdrawals/options?country={CC}
+GET /withdrawals/institutions?country={CC}&fiat={CCY}&paymentMethod={METHOD}
+```
+
+`options` takes only `country=` as a query param — `fiat`, `paymentMethod`, and `asset` come back as fields on each response item. Filter the result client-side to the corridor you're targeting. Empty array (or no items matching your `{fiat, paymentMethod}`) = corridor not configured for your org. `institutions` returns:
+
+```json
+{
+  "allInstitutionsSupported": false,
+  "institutionIdentifier": "bankSlug",
+  "supportedInstitutions": [
+    { "name": "BANCO GALICIA", "slug": "gOLB1gcN-Xbq..." }
+  ]
+}
+```
+
+Two fields decide what your PI must contain:
+
+- **`institutionIdentifier`** — names the field your PI's `details` must include to identify the bank. Possible values: `bankSlug`, `bankCode`, `bankRoutingNumber`, `swiftOrBicNumber`, `bankName`. The same corridor through a different PFI may switch this.
+- **`allInstitutionsSupported`** — `true` means any valid value for that identifier works; `false` means you MUST pick from `supportedInstitutions` and use the `slug` value (typically the `bankSlug` field).
+
+**Never cache bank slugs.** They are PFI-specific and become invalid the moment routing changes. Discover at runtime.
+
+**Options ≠ availability.** A corridor that appears in `/options` but errors with "No suitable service" on `/quotes` is not actually live for your org. Confirm with a quote before building against it.
+
+
 
 ## Optional: get a quote first
 
@@ -59,18 +94,47 @@ Body:
 }
 ```
 
-The `details` schema varies by `country` + `paymentMethod`. Examples:
-- **US / ACH:** `bankRoutingNumber`, `bankAccountNumber`, `bankAccountType`
-- **Brazil / PIX:** PIX key (email, phone, CPF, or random key)
-- **Mexico / SPEI:** CLABE
-- **Nigeria / Mobile Money:** provider + phone number
-- **EU / SEPA:** IBAN + BIC
-
-Use `GET /withdrawals/institutions` for the target country/currency/paymentMethod to discover the required `details` schema dynamically.
+The `details` schema varies sharply by `country` + `paymentMethod` — and includes per-country **forbidden** fields that cause 422s if you include them. Use `GET /withdrawals/institutions` (step 0) to discover the required identifier dynamically. The table below is a working snapshot; treat the live discovery response as authoritative.
 
 **Capture `id` from the response** — this is the `paymentInstructionId` for step 2.
 
-Payment instructions can be reused for repeat payouts to the same beneficiary. Persist them; don't re-create on every transaction.
+Payment instructions can be reused for repeat payouts to the same beneficiary. Persist them; don't re-create on every transaction. **Exception — tainted PIs:** if a withdrawal against a PI fails on the PFI side, retries against the same PI can come back with a generic "Validation error from PFI" even after you fix the upstream issue. When recovering from a failed withdrawal, create a fresh PI and reference the new `paymentInstructionId`.
+
+### Payment instruction `details` by corridor
+
+The required and forbidden field sets differ by country and method. Forbidden fields produce 422 at PI creation; missing required fields often pass PI creation but fail the withdrawal asynchronously with a `pfiErrorMessage`.
+
+> The table below is a working snapshot drawn from observed integration behavior. The Borderless docs cover the most common corridors (US, UK, EU, BR, MX) explicitly; the long-tail corridors (AE/NPSS, IN/IMPS_FIRC, AU/BECS, etc.) are validated empirically and may shift if PFI routing changes. Always treat the live `/withdrawals/institutions` response as authoritative for the `institutionIdentifier` field, and the PFI's async `pfiErrorMessage` as authoritative for required fields you may have missed.
+
+| Country / Method | Required `details` | Forbidden | Notes |
+|---|---|---|---|
+| **US / ACH** | `bankName`, `accountHolderName`, `bankAccountNumber`, `bankRoutingNumber`, `bankAccountType`, `address` | — | `bankAccountType` is `Checking` or `Savings`. |
+| **US / Wire** | `bankName`, `accountHolderName`, `bankAccountNumber`, `bankRoutingNumber`, `address` | — | |
+| **GB / BankTransfer** | `bankName`, `accountHolderName`, `bankAccountNumber`, `address` | `sortCode`, `iban` | UK uses `bankAccountNumber` only. |
+| **EU / SEPA** | `bankName`, `accountHolderName`, `bankAccountNumber` (must hold the **full IBAN**), `swiftOrBicNumber`, `accountOwnerType`, `address`. `businessName` if `accountOwnerType` is `Business`. | `iban` | Field requirements differ across PFIs. The `iban` field name is rejected on some routes; carry the IBAN in `bankAccountNumber`. A bare account number passes PI creation but fails async with "bankAccountNumber is invalid". |
+| **BR / PIX** | `identifierType`, `identifierValue`, `address` | `bankName`, `accountHolderName`, `bankAccountNumber` | PIX is identifier-based. `identifierType` is `Email` / `CPF` / `CNPJ` / `PhoneNumber` / `EVP`. |
+| **AR / COELSA** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber` (22-digit CBU/CVU), `bankAccountType`, `address` | — | Some PFIs strict-validate the CUIT (mod-11) on the identity and require `address.country == "AR"`. |
+| **CO / PSE** | `bankName`, `accountHolderName`, `bankAccountNumber`, `bankAccountType`, `address`, plus `bankCode` **or** `bankSlug` (per discovery) | — | Use whichever the `institutionIdentifier` says. Some PFIs require `address.country == "CO"`. |
+| **MX / SPEI** | `bankName`, `accountHolderName`, `bankAccountNumber` (18-digit CLABE), `address` | — | The 18-digit CLABE goes in `bankAccountNumber`. |
+| **NG / BankTransfer** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber`, `address` | — | Discover the slug — provider-specific and not interchangeable across PFIs. Some PFIs cap per-transaction value (~$3,164 USD equiv). |
+| **AE / NPSS** | `iban`, `address` | `bankName`, `accountHolderName`, `bankAccountNumber` | One of the few corridors where the `iban` field name is correct. |
+| **IN / IMPS_FIRC** | `bankAccountNumber`, `localRoutingCode` (IFSC), `bankName`, `accountHolderName`, `address` | `bankCode` (silently ignored), `localRoutingNumber` (rejected) | Withdrawals here also need a `documents: [{ type: "Invoice", content: "..." }]` on the withdrawal call (see step 2). `localRoutingCode` is accepted on creation but not echoed back in GET responses. |
+| **PH / BankTransfer** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber`, `address` | — | For e-wallets like GCash, the `bankAccountNumber` is the phone number. Discover the GCash slug. |
+| **ZA / EFT** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber`, `address` | — | Method is `EFT`, not `BankTransfer`. |
+| **PK / IBFT** | `bankSlug`, `iban`, `address` | `bankName`, `accountHolderName`, `bankAccountNumber` | IBAN format `PK36ABPL...`. |
+| **CA / EFT** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber`, `localRoutingCode` (transit number `XXX-XXXXX` or `XXXXX-XXX`), `address` | `transitNumber` | The Canadian transit number lives in `localRoutingCode`, not `transitNumber`. |
+| **AU / BECS** | `accountHolderName`, `bankAccountNumber`, `localRoutingCode` (6-digit BSB), `address` | `bsbNumber` | The BSB number lives in `localRoutingCode`. |
+| **JP / BankTransfer** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber`, `bankCode` (`XXXX-XXX` — 4-digit bank, 3-digit branch), `address` | — | The exception to the `localRoutingCode` rule: JPY routing identifier is `bankCode`. Wrong format fails async. |
+| **TH / BankTransfer**, **ID / BankTransfer**, **SG / BankTransfer**, **KE / BankTransfer**, **GH / BankTransfer**, **BD / BankTransfer** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber`, `address` | — | Standard slug-based. **GH withdrawals also require an Invoice document** on the withdrawal call (see step 2). |
+
+### Field-naming traps that bite
+
+- **`street1`, not `addressLine1` / `address1`.** The first address line is always `street1`. Other names 422.
+- **The `iban` field is corridor-specific.** `iban` is accepted only on AE/NPSS and PK/IBFT (and possibly other routes per discovery). On EU/SEPA the IBAN goes in `bankAccountNumber`. On most other corridors, `iban` is rejected outright.
+- **`localRoutingCode` is the catch-all routing field.** BSB (AU), transit (CA), IFSC (IN) all carry through `localRoutingCode`. The provider-native names (`bsbNumber`, `transitNumber`, `ifscCode`) are rejected. The lone exception is JP, which uses `bankCode`.
+- **Async PFI errors quote the provider's field name** ("bank.bsbNumber is required", "bank.transitNumber is required") even though the Borderless field is different. Translate before retrying.
+- **`bankCode` vs. `bankSlug`.** Both can be the value of `institutionIdentifier`. Always use the field name that discovery returned, not the one you remember.
+- **Invoice-required corridors fail async, not sync.** If `country` is `IN` / `GH` / `CN` (or `BR` over 50,000 BRL), include `documents: [{ type: "Invoice", content: "data:image/jpeg;base64,..." }]` in the **withdrawal** request (step 2). Without it, PI and withdrawal both submit, then the transaction fails with "please upload an invoice…".
 
 ## 2. Create the withdrawal
 
@@ -91,9 +155,14 @@ Body:
   "paymentPurpose": "personal remittance",  // REQUIRED. Enum — see list below.
   "developerFee": "5.00",                   // optional, your markup
   "purposeDescription": "Monthly...",       // optional
-  "reference": "INV-2025-001"               // optional, echoed back in the transaction
+  "reference": "INV-2025-001",              // optional, echoed back in the transaction
+  "documents": [                            // REQUIRED for IN, GH, CN, and BR ≥ 50,000 BRL
+    { "type": "Invoice", "content": "data:image/jpeg;base64,..." }
+  ]
 }
 ```
+
+The `documents` array is required for invoice-corridor withdrawals (India, Ghana, China, and Brazil over 50,000 BRL). Supported formats: JPEG / PNG / PDF, base64 data URI, min 200×200 px, max 5 MB. Skipping it does not 422 — the withdrawal submits, then transitions to `Failed` with "please upload an invoice…".
 
 **`paymentPurpose` is required** — the PFI uses it for AML / travel-rule filings. Must be one of: `salary payment`, `personal remittance`, `rent payment`, `property purchase`, `owned account abroad`, `advertising expenses`, `advisory fees`, `business insurance`, `construction`, `delivery fees`, `education`, `exports`, `donation`, `hotel`, `loan payment`, `maintenance expenses`, `medical expense`, `office expenses`, `royalty fees`, `service charge`, `shares investment`, `tax payment`, `transportation fees`, `travel`, `utility bills`, `other`.
 

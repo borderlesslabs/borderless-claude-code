@@ -12,11 +12,26 @@ A deposit converts local fiat → stablecoin. The payment originator sends fiat 
 ## The flow
 
 ```
+0. Discover the corridor → GET  /deposits/options                              (run before submitting)
 (optional) Get quote     → GET  /deposits/quotes
 1. Create deposit        → POST /deposits                    → returns payment instructions
 2. Originator sends fiat → out-of-band, directly to PFI bank  (ACH / Wire / PIX / etc.)
 3. PFI releases stablecoin → webhook: Transaction_Updated → status: Completed
 ```
+
+## 0. Discover the deposit corridor first
+
+```bash
+GET /deposits/options?country={CC}
+```
+
+Returns an array of `{paymentMethod, fiat, asset, country}` items. Filter client-side to the `{fiat, paymentMethod}` you want. Empty result for the corridor = not configured for your org. **Always pass `country=`** — the unfiltered `/deposits/options` paginates and frequently drops common countries (US in particular).
+
+**Deposits and withdrawals have separate PFI configurations.** A corridor that works for withdrawals on your org may not be enabled for deposits, and vice versa. If `/deposits` later fails with "Invalid provider" or "Failed to create deposit payment", the on-ramp side is not provisioned even though the corridor showed up — contact support.
+
+Unlike withdrawals, deposits do **not** use `/deposits/institutions` — bank routing details are returned by the API after submission, not configured by you.
+
+
 
 Track with `GET /transactions/{id}` or by listening for `Transaction_Updated` webhooks.
 

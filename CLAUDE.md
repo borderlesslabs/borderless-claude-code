@@ -19,12 +19,12 @@ You're working inside the `borderless-claude-code` toolbox repo. It contains ski
 
 ### Authentication — OAuth 2.0 client credentials
 
-All endpoints require a bearer token obtained via `POST /auth/m2m/token` with `clientId` + `clientSecret`. Tokens expire in `expiresIn` seconds (typically 3600). **Cache the token and refresh before expiry** — do not call `/auth/m2m/token` on every request.
+All endpoints require a bearer token obtained via `POST /auth/m2m/token` with `clientId` + `clientSecret`. Tokens expire in `expiresIn` seconds (typically ~82800, i.e. ~23 hours). Always read `expiresIn` from the response — don't hardcode the lifetime. **Cache the token and refresh before expiry** — do not call `/auth/m2m/token` on every request.
 
 ```
 POST /auth/m2m/token
 Body: { "clientId": "...", "clientSecret": "..." }
-Response: { "accessToken": "...", "tokenType": "Bearer", "expiresIn": 3600, "piiAccess": "all" }
+Response: { "accessToken": "...", "tokenType": "Bearer", "expiresIn": 82800, "piiAccess": "all" }
 ```
 
 **Never** log, commit, or print `clientSecret` or `accessToken`. Read them from env vars: `BORDERLESS_CLIENT_ID`, `BORDERLESS_CLIENT_SECRET`.
@@ -83,11 +83,14 @@ Identity  →  Compliance Check  →  Account  →  Transaction
 
 ## Common failure modes
 
-- **401 Unauthorized** after ~1 hour — access token expired. Refresh it.
+- **401 Unauthorized** after ~23 hours — access token expired. Refresh it. (Tokens last roughly a day; the exact value is in `expiresIn`.)
 - **`instructions: null`** on deposit creation — KYC/KYB is still pending at the PFI. Fetch instructions later via `GET /transactions/{id}` or a webhook; do not retry the deposit.
 - **Compliance check stuck in `NotStarted`** — check `requiredExtras.acceptTermsOfService` and `missingFields` via `GET /identities/{id}/compliance-checks/{slug}/requirements`.
 - **Withdrawal sitting open** — the PFI hasn't received stablecoins at the returned `toAddress`, or the `fromAddress` doesn't match, or the chain is wrong.
 - **Webhook marked `enabled: false`** — delivery exhausted its retry budget. Your endpoint returned non-200 or errored. Re-enable via `PATCH /notifications/webhooks/settings/{id}`. See `cookbook/webhook-replay.md`.
+- **`Validation error from PFI` with no detail on retry** — the previous attempt tainted the payment instruction on the PFI side. Create a fresh PI and resubmit. See `cookbook/error-catalog.md`.
+
+For a full message → cause → fix table (sync 4xx and async PFI failures), see `cookbook/error-catalog.md`.
 
 ---
 
@@ -98,7 +101,8 @@ Claude auto-loads skills based on what you're doing. You can also invoke them ma
 **Skills** (`.claude/skills/`):
 - `borderless-compliance-flow` — identity creation, requirements discovery, document upload, starting a compliance check.
 - `borderless-deposit-flow` — end-to-end on-ramp (fiat → stablecoin).
-- `borderless-withdrawal-flow` — end-to-end off-ramp including payment instructions.
+- `borderless-withdrawal-flow` — end-to-end off-ramp including payment instructions and per-corridor `details` requirements.
+- `borderless-virtual-account-flow` — dedicated, named bank accounts that auto-convert any incoming fiat to stablecoin (recurring deposits, payroll funding, treasury).
 - `borderless-webhook-verifier` — signature-verifying handlers in TS, Python, and Go.
 
 **Commands** (`.claude/commands/`):
@@ -143,3 +147,12 @@ Each example is a standalone TypeScript project. The `FORK HERE` comment on the 
 - **Quick start (mirrors `/borderless-onboard`):** https://docs.borderless.xyz/docs/quick-start-guide.md
 - **Webhooks:** https://docs.borderless.xyz/docs/webhooks.md
 - **Support:** support@borderless.xyz
+
+## Cookbook
+
+- `cookbook/amount-handling.md` — decimal types, never floats.
+- `cookbook/error-catalog.md` — sync + async error message → cause → fix.
+- `cookbook/reconciliation.md` — recovering after a webhook gap.
+- `cookbook/sandbox-to-production.md` — checklist before flipping to production.
+- `cookbook/testing-compliance-locally.md` — running compliance flows in dev.
+- `cookbook/webhook-replay.md` — re-enabling an auto-disabled webhook.

@@ -24,7 +24,7 @@ Audit this project's Borderless integration for common anti-patterns. For each f
 
 6. **Leaked secrets.** Any occurrence of `clientSecret`, `accessToken`, `imageFront`, `imageBack`, `taxId`, or full identity payloads in log calls (`console.log`, `logger.info`, `print`, etc.).
 
-7. **Access token reuse without refresh.** Auth helpers that call `/auth/m2m/token` on every request (wasteful) or never refresh (will 401 after ~1 hour).
+7. **Access token reuse without refresh.** Auth helpers that call `/auth/m2m/token` on every request (wasteful) or never refresh (will 401 after ~23 hours, the typical token lifetime — confirm against the `expiresIn` returned by the auth endpoint, do not hardcode).
 
 8. **Quote-as-settlement.** Code that persists or displays `toAmount` from `/deposits/quotes` or `/withdrawals/quotes` as a final settlement amount. Quotes are estimates.
 
