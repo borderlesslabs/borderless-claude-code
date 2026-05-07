@@ -189,6 +189,8 @@ Process events transactionally so a mid-processing crash doesn't leave partial s
 
 ### Event types
 
+The OpenAPI spec doesn't publish a closed event-type enum, so the list below is what's documented + observed. Treat unknown event types as **non-fatal** in your handler — log and 200, don't throw.
+
 - `Transaction_Created`
 - `Transaction_Updated`
 - `VirtualAccount_Created`
@@ -206,6 +208,14 @@ Process events transactionally so a mid-processing crash doesn't leave partial s
 - `Approval`
 
 Branch your handler on `event_type` first, then on operation type for transaction events.
+
+### Inspecting recent webhook deliveries
+
+```bash
+GET /v1/notifications/webhooks/events
+```
+
+Returns a paginated `{data: [WebhookEventEntity], hasMore}` log of recent deliveries with their status (`Pending` / `Retry` / `Failed` / `Completed`) and `failureReason`. Useful for debugging a misbehaving endpoint without standing up extra logging — you can see exactly which events Borderless tried to deliver and what came back.
 
 ## Handler skeleton
 

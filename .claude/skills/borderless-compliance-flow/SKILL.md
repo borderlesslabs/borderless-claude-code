@@ -50,6 +50,8 @@ This returns the compliance `slug` for the `{country, asset, fiat, paymentMethod
 GET /identities/{identityId}/compliance-checks?country=US&asset=USDC_BASE&fiat=USD&paymentMethod=ACH&type=Deposit
 ```
 
+> **Org-level alternative:** `GET /v1/compliance-checks/coverage` returns every compliance slug configured on your organization with its `coverage` array (`{type, operationType, method, fiat, country, asset}`). Useful for building a corridor-to-slug lookup once at startup, instead of querying per identity. Reject the URL params `country`/`asset`/etc. — this endpoint takes none.
+
 Key response fields:
 - `slug` — identifier for this specific compliance check. Save it.
 - `status` / `kycStatus` — current compliance state. See the [status table](#status-values) below for the full enum. Both fields usually mirror each other.
@@ -66,7 +68,7 @@ GET /identities/{identityId}/compliance-checks/{slug}/requirements
 Key response fields:
 - `missingFields` — identity fields still needed (e.g., `address.postalCode`). Patch them onto the identity via update endpoints.
 - `requiredDocuments[].mode` — `oneOf` (pick one) or `allOf` (provide all).
-- `requiredDocuments[].documents` — list of accepted document types (`Passport`, `DriversLicense`, etc.).
+- `requiredDocuments[].documents` — list of accepted document types from the `IdentityDocumentType` enum: `Passport`, `DriverLicense`, `NationalId`, `ResidencePermit`, `Formation`, `Ownership`, `ProofOfAddress`, `SourceOfFunds`, `IndividualHolding`, `BVN_NG` (Nigeria Bank Verification Number), `Selfie`, `Aadhaar` (India), `PAN` (India). The `subType` field carries finer-grained classification for `ProofOfAddress` (`UtilityBill`, `BankStatement`, `RentalAgreement`, `TaxDocument`, `GovernmentCorrespondence`).
 - `requiredExtras.acceptTermsOfService.link` — ToS URL if applicable.
 
 Use this to drive your UI. Only ask the end user for what this endpoint says is required.
@@ -108,18 +110,21 @@ Response returns `{ slug, status, metadata }`.
 
 ## Status values
 
-Compliance-check `status` (and `kycStatus`, which usually mirrors it) goes through these values. Not every check hits every intermediate state.
+Compliance-check `status` (and `kycStatus`, which usually mirrors it) goes through these values. The full `ComplianceStatus` enum from the API spec:
 
-| Status | Meaning |
-|---|---|
-| `NotStarted` | Default after step 2, before you POST to start the check. Not an error. |
-| `Started` | Check has been initiated by step 6; PFI is picking it up. |
-| `InProgress` | PFI is running the check. |
-| `UnderReview` | PFI has human-review in the loop. Can sit here for extended periods in sandbox (Bridge in particular). |
-| `Completed` / `Approved` | Terminal success. Depending on PFI the field may hold either literal value — handle both. |
-| `Rejected` | Terminal failure. Read `rejectionReasons` for why. |
+| Status | Meaning | Terminal? |
+|---|---|---|
+| `NotStarted` | Default after step 2, before you POST to start the check. Not an error — many checks sit here until you call step 6. | No |
+| `Started` | Check has been initiated by step 6; PFI is picking it up. | No |
+| `Incomplete` | PFI started the check but is blocked on missing info. Refetch `requirements` — `missingFields`, `requiredDocuments`, or `requiredExtras` will say what's needed. | No |
+| `AwaitingUbo` | (Business identities) PFI is waiting on UBO compliance. The UBO personal identities each have their own `status` — chase those. | No |
+| `UnderReview` | PFI has human-review in the loop. Can sit here for extended periods in sandbox (Bridge in particular). | No |
+| `PreApproved` | PFI requires no per-identity check for this corridor — you can transact immediately. | Yes (success) |
+| `Approved` | Terminal success. PFI has cleared the identity for this corridor. | Yes (success) |
+| `Rejected` | Terminal failure. Read `rejectionReasons` for the structured reason codes (e.g., `DocumentExpired`, `DocumentBlurry`). | Yes (failure) |
+| `Cancelled` | Check was cancelled — typically because requirements changed or the PFI deprecated the corridor. Re-discover and start over. | Yes |
 
-Treat `NotStarted`, `Started`, `InProgress`, `UnderReview` as non-terminal. Poll or wait for a webhook.
+Treat `NotStarted`, `Started`, `Incomplete`, `AwaitingUbo`, `UnderReview` as non-terminal. Poll or wait for a webhook. **Do not assume `Completed` exists** — it's not in the enum. Success is `Approved` or `PreApproved`.
 
 ## Timelines
 

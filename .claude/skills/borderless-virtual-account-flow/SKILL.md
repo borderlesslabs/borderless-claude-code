@@ -59,7 +59,13 @@ The asset specified here must already be on the account. If it isn't, you'll get
 GET /accounts/{accountId}/virtual-accounts
 ```
 
-Poll until the relevant entry's `status` flips from `NotActive` to `Active`. Sandbox typically activates in 5–20 seconds; production can be longer.
+Response is paginated:
+
+```json
+{ "data": [ { "id": "...", "status": "Active", "depositInstructions": [...] } ], "hasMore": false }
+```
+
+Iterate `data` and find the entry whose `id` matches the one returned at creation. Poll until its `status` flips from `NotActive` to `Active`. Sandbox typically activates in 5–20 seconds; production can be longer. If `hasMore` is true, paginate (cursor-based — see CLAUDE.md).
 
 | Status | Meaning |
 |---|---|
@@ -103,6 +109,8 @@ When `Active`, `depositInstructions` is an array — one entry per supported rai
 - The account is in **your** name, not the PFI's omnibus name. Surface this to the sender accurately.
 - There is **no `depositMessage`** / reference code. The account number is the attribution key. Including a reference is harmless but unnecessary.
 - Funds sent to this account auto-convert to the configured `asset` and credit the linked Borderless account.
+
+**`VirtualAccountEntity` field caveat:** the entity carries both `depositInstructions` (the typed array shown above) and a deprecated `instructions` field (flatter snake_case shape, kept for backward compat). New code should read `depositInstructions`.
 
 ## 4. Monitor incoming funds
 

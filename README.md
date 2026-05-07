@@ -85,11 +85,11 @@ Flag column tells you at a glance: `[D/W]` = both directions, `[D  ]` = deposit-
 
 ## What's in the repo
 
-- `.claude/skills/` — four flow skills (compliance, deposit, withdrawal, webhooks) that Claude auto-loads when relevant.
+- `.claude/skills/` — six flow skills (compliance, deposit, withdrawal, virtual accounts, exchange, webhooks) that Claude auto-loads when relevant. The withdrawal skill includes a per-corridor table of required and forbidden payment-instruction fields plus the seven `details` DTO variants the API accepts.
 - `.claude/commands/` — slash commands: `/borderless-onboard`, `/borderless-coverage`, `/borderless-scaffold`, `/borderless-lint`, `/borderless-test-webhook`, `/borderless-install-into`.
 - `.claude/agents/borderless-integration-reviewer.md` — a reviewer subagent you invoke for PR audits.
 - `examples/` — five runnable TypeScript references that chain: `compliance-personal/` → `account-setup/` → `deposit-us-ach-to-usdc/` → `withdrawal-usdc-to-us-ach/`, plus a standalone `webhooks/` Express handler. Each prints the env-var values the next step needs.
-- `cookbook/` — short guides for post-onboarding situations (reconciliation, webhook replay, compliance testing, amount handling).
+- `cookbook/` — short guides for post-onboarding situations: amount handling, the error catalog (sync + async PFI failures, full status enums), reconciliation (including the `/reconciliation/items` and `/orphaned-transactions` endpoints), sandbox-to-production checklist, compliance testing, webhook replay.
 - `prompts/` — copy-paste prompt templates for larger tasks (build an integration in your stack, audit your integration, migrate from another vendor).
 - `CLAUDE.md` — the workspace context Claude reads on every session. Covers base URLs, auth, the Identity → Compliance → Account → Transaction mental model, and hard rules.
 - `CUSTOMIZE.md` — what to edit, what to leave alone, what to delete.

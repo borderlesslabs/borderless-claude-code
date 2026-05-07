@@ -20,11 +20,26 @@ curl "$BORDERLESS_BASE_URL/transactions?startingAfter=<cursor>&limit=100" \
 
 List endpoints are cursor-paginated (`startingAfter` + `limit`), not offset-based. Walk pages until exhausted.
 
-For each Borderless transaction: look it up in your ledger by `reference`. If found and both sides agree on status + amount, continue. If they disagree, that's your reconciliation report entry.
+`/transactions` accepts useful filters per the `TransactionsQuery` schema: `status`, `type` (`Deposit` / `Withdrawal` / `Exchange`), `pfiName`, `sourceAccountId`, `destinationAccountId`, `includeAccounts`, `fromDate` / `toDate` (creation), `fromUpdatedDate` / `toUpdatedDate` (state change), `counterPartyIdentityId`. Use `fromUpdatedDate` for incremental sync — pull anything updated since your last reconciliation watermark.
 
-## Orphaned transactions
+For each Borderless transaction: look it up in your ledger by `reference`. If found and both sides agree on status + amount, continue. If they disagree, that's your reconciliation report entry. Compare the response's `reconciliationStatus` field too — Borderless's own assessment of whether the transaction is in sync with the PFI.
 
-Borderless occasionally surfaces transactions that exist on their side but haven't been matched to an external reference — usually because a deposit arrived at a PFI's bank with a memo that didn't cleanly map back to one of your operations.
+Bulk export option: `GET /transactions/export` returns a downloadable file (same filters as `/transactions`) for offline analysis.
+
+## Reconciliation endpoints (server-side helpers)
+
+Borderless exposes three reconciliation endpoints to surface mismatches on their side, separate from your own ledger walk:
+
+```bash
+GET /reconciliation/items?status={STATUS}                # paginated list of reconciliation items
+GET /reconciliation/items/{transactionId}                # full reconciliation result for one transaction
+GET /reconciliation/orphaned-transactions?pfiName={PFI}  # paginated list of unmatched PFI-side transactions
+GET /reconciliation/orphaned-transactions/{id}           # one orphan in detail
+```
+
+`/reconciliation/items` returns Borderless's own reconciliation status for transactions it knows about — useful for catching transactions where Borderless and the PFI disagree, before that disagreement hits your ledger.
+
+`/reconciliation/orphaned-transactions` returns transactions that exist on a PFI's side but haven't been matched to a Borderless transaction — usually because a deposit arrived at a PFI's bank with a memo that didn't cleanly map back to one of your operations. Each orphan carries `externalId`, `externalData`, `pfiName`, `sourceAmount`, `destinationAmount`, `sourceCurrency`, `destinationCurrency`, `type`, `periodStart`, `periodEnd`.
 
 ```bash
 curl "$BORDERLESS_BASE_URL/reconciliation/orphaned-transactions" \

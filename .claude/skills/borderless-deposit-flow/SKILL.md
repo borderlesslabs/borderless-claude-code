@@ -25,11 +25,11 @@ A deposit converts local fiat → stablecoin. The payment originator sends fiat 
 GET /deposits/options?country={CC}
 ```
 
-Returns an array of `{paymentMethod, fiat, asset, country}` items. Filter client-side to the `{fiat, paymentMethod}` you want. Empty result for the corridor = not configured for your org. **Always pass `country=`** — the unfiltered `/deposits/options` paginates and frequently drops common countries (US in particular).
+Returns an array of `{id, country, fiat, method, asset}` items (note: `method`, not `paymentMethod`). Filter client-side to the `{fiat, method}` you want. Empty result for the corridor = not configured for your org. **Always pass `country=`** — the unfiltered `/deposits/options` paginates and frequently drops common countries (US in particular).
 
 **Deposits and withdrawals have separate PFI configurations.** A corridor that works for withdrawals on your org may not be enabled for deposits, and vice versa. If `/deposits` later fails with "Invalid provider" or "Failed to create deposit payment", the on-ramp side is not provisioned even though the corridor showed up — contact support.
 
-Unlike withdrawals, deposits do **not** use `/deposits/institutions` — bank routing details are returned by the API after submission, not configured by you.
+`GET /deposits/institutions?country=&fiat=&paymentMethod=` exists with the same shape as the withdrawals variant (`{allInstitutionsSupported, institutionIdentifier, supportedInstitutions, country, fiat, paymentMethod}`). For most deposit corridors you don't need to call it — the originator sends fiat to bank details Borderless returns after submission. The exception is corridors where the deposit involves a `paymentInstructionId` (mobile money, some LATAM rails) — there you'll need a PI created in advance, and `/deposits/institutions` is the discovery for that PI.
 
 
 
@@ -58,12 +58,18 @@ Headers:
   idempotency-key: {uuid}
 Body:
 {
-  "fiat": "USD",
-  "amount": "1000.00",
-  "asset": "USDC_POLYGON",
+  "fiat": "USD",                            // REQUIRED on deposits (unlike withdrawals)
+  "country": "US",                          // REQUIRED on deposits (unlike withdrawals)
+  "amount": "1000.00",                      // fiat amount the originator will send
+  "asset": "USDC_POLYGON",                  // target stablecoin
   "accountId": "{accountIdFromAccountsSetup}",
-  "paymentMethod": "ACH",
-  "country": "US"
+  "paymentMethod": "ACH",                   // explicit on deposits — no auto-routing
+  "paymentInstructionId": "...",            // optional — required for mobile-money and some LATAM corridors
+  "source": { ... },                        // optional — sender details, required for some MobileMoney deposits
+  "redirectUrl": "https://...",             // optional — used by MobileMoney flows that need a browser redirect
+  "counterPartyIdentityId": "...",          // optional — defaults to the account's identity
+  "developerFee": "5.00",                   // optional, your markup
+  "documents": [ ... ]                      // optional invoice for invoice-required corridors
 }
 ```
 
@@ -88,7 +94,7 @@ The response shape (abbreviated):
 The response carries two parallel instruction fields:
 
 - **`depositInstruction`** — the typed, canonical shape (`{ paymentMethod, details: { bankName, bankAccountNumber, bankRoutingNumber, ... } }`). Prefer reading from this.
-- **`instructions`** — a flatter snake_case variant (`{ bank_name, bank_account_number, ... }`). Kept populated for compatibility; same information.
+- **`instructions`** — a flatter snake_case variant (`{ bank_name, bank_account_number, ... }`). **Deprecated** in the current spec ("Use `withdrawalOnchainInstruction` or `depositInstruction` instead") but still populated for backward compatibility. New integrations should read `depositInstruction`.
 
 Both are usually `null` at creation if KYC/KYB is still settling at the PFI. **Do not retry the deposit.** Either:
 
@@ -113,6 +119,8 @@ Once the PFI reconciles the incoming fiat, it releases stablecoin to the destina
 
 ## Lifecycle summary
 
+The full `TransactionStatus` enum is: `Submitted`, `Verifying`, `Orchestrating`, `Pending`, `Processing`, `Completed`, `Failed`, `Cancelled`, `Refunded`.
+
 | Status | Meaning |
 |---|---|
 | `Submitted` | Order received by Borderless and queued for processing. |
@@ -121,8 +129,9 @@ Once the PFI reconciles the incoming fiat, it releases stablecoin to the destina
 | `Pending` | Awaiting action from the originator — for deposits, the fiat transfer hasn't arrived yet. This is the state where `depositInstruction` is usually populated and the originator is expected to send fiat. |
 | `Processing` | Fiat received by PFI; stablecoin transfer to the destination account in progress. |
 | `Completed` | Stablecoins delivered. Terminal. |
-| `Failed` | See `failureReason`. Terminal. |
+| `Failed` | See `failureReason.details[].pfiErrorMessage`. Terminal. |
 | `Cancelled` | Cancelled by the caller (`POST /transactions/{id}/cancel`) or by the PFI. Terminal. |
+| `Refunded` | PFI returned the fiat after delivery couldn't complete. Terminal. |
 
 ## Cancellation
 
@@ -130,7 +139,7 @@ Once the PFI reconciles the incoming fiat, it releases stablecoin to the destina
 POST /transactions/{id}/cancel
 ```
 
-Cancellation only works from non-terminal early states (`Submitted`, `Verifying`, `Orchestrating`, `Pending`). Once the transaction reaches `Processing`, the PFI is already moving funds and the cancel is denied.
+No body. Returns 202 on accept. Cancellation only works from non-terminal early states (`Submitted`, `Verifying`, `Orchestrating`, `Pending`). Once the transaction reaches `Processing`, the PFI is already moving funds and the cancel is denied.
 
 ## Common pitfalls when generating code
 

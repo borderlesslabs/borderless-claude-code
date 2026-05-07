@@ -153,7 +153,9 @@ This is true even when the underlying problem was on the identity, not the PI it
 
 ## Status reference
 
-| Transaction status | Meaning | Action |
+### Transaction status (`TransactionStatus` enum)
+
+| Status | Meaning | Action |
 |---|---|---|
 | `Submitted` | Received and queued | Poll. |
 | `Verifying` | PFI KYC review in progress | Poll. |
@@ -163,6 +165,21 @@ This is true even when the underlying problem was on the identity, not the PI it
 | `Completed` | Done. Terminal. | — |
 | `Failed` | Read `failureReason.details[].pfiErrorMessage`. Terminal. | Fix, then submit a new transaction. |
 | `Cancelled` | Terminal. Often compliance-related. | Fix the precondition, then submit a new transaction. |
+| `Refunded` | PFI returned funds after a post-broadcast failure. Terminal. | Reconcile against your ledger; check `refundAddress` (withdrawal) or PFI bank record (deposit). |
+
+### Compliance status (`ComplianceStatus` enum)
+
+| Status | Meaning | Action |
+|---|---|---|
+| `NotStarted` | Default before you `POST /compliance-checks/{slug}`. | Run requirements check, then start. |
+| `Started` | PFI is picking up the check. | Poll / webhook. |
+| `Incomplete` | PFI started but is blocked on missing info. | Refetch `requirements`. Read `missingFields`, `requiredDocuments`, `requiredExtras`. Patch identity / re-upload doc / accept ToS, then re-poll. |
+| `AwaitingUbo` | Business identity waiting on UBO compliance. | Drive each UBO personal identity to `Approved` / `PreApproved`. |
+| `UnderReview` | Human review at the PFI. Can sit here for hours / days in production, sometimes indefinitely in sandbox. | Wait. Set a hard timeout if your UX would be blocked. |
+| `PreApproved` | No per-identity check needed for this corridor. | Transact immediately. |
+| `Approved` | Terminal success. | Transact. |
+| `Rejected` | Terminal failure. | Read `rejectionReasons` (`DocumentExpired`, `DocumentBlurry`, etc.). Fix and re-discover a slug. |
+| `Cancelled` | Check cancelled (corridor deprecated, requirements changed). | Re-discover slugs and start over. |
 
 ---
 

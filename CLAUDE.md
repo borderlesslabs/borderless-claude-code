@@ -19,12 +19,12 @@ You're working inside the `borderless-claude-code` toolbox repo. It contains ski
 
 ### Authentication — OAuth 2.0 client credentials
 
-All endpoints require a bearer token obtained via `POST /auth/m2m/token` with `clientId` + `clientSecret`. Tokens expire in `expiresIn` seconds (typically ~82800, i.e. ~23 hours). Always read `expiresIn` from the response — don't hardcode the lifetime. **Cache the token and refresh before expiry** — do not call `/auth/m2m/token` on every request.
+All endpoints require a bearer token obtained via `POST /auth/m2m/token` with `clientId` + `clientSecret`. Tokens expire in `expiresIn` seconds (typically ~86400, i.e. ~24 hours; observed sandbox value is 86399). Always read `expiresIn` from the response — don't hardcode the lifetime. **Cache the token and refresh before expiry** — do not call `/auth/m2m/token` on every request.
 
 ```
 POST /auth/m2m/token
 Body: { "clientId": "...", "clientSecret": "..." }
-Response: { "accessToken": "...", "tokenType": "Bearer", "expiresIn": 82800, "piiAccess": "all" }
+Response: { "accessToken": "...", "tokenType": "Bearer", "expiresIn": 86399, "piiAccess": "all" }
 ```
 
 **Never** log, commit, or print `clientSecret` or `accessToken`. Read them from env vars: `BORDERLESS_CLIENT_ID`, `BORDERLESS_CLIENT_SECRET`.
@@ -59,8 +59,8 @@ Identity  →  Compliance Check  →  Account  →  Transaction
 
 1. **Identity** — a `Personal` or `Business` entity. Created once, reused forever. Holds PII and documents.
 2. **Compliance Check** — a KYC/KYB process tied to a specific `{PFI, country, asset, fiat, paymentMethod, type}` combination, identified by a `slug`. The same identity can have multiple compliance checks for different corridors.
-3. **Account** — the funds-holding structure tied to an identity. Typically a stablecoin wallet (Fireblocks, Utila, Dfns, Standalone, etc.) or a PFI-held fiat balance.
-4. **Transaction** — a `Deposit` (fiat → stablecoin), `Withdrawal` (stablecoin → fiat), `Exchange`, or related operation.
+3. **Account** — the funds-holding structure tied to an identity. Typically a stablecoin wallet (Fireblocks, Utila, Dfns, Standalone, etc.) or a PFI-held fiat balance. The `POST /accounts` body is a `oneOf` over infra-specific create DTOs: `AccountStandaloneCreateDto` (you control the wallet, just declare addresses), `AccountUtilaCreateDto` (Utila vault + walletId), `AccountDfnsCreateDto`, `AccountWeb3ProviderCreateDto` (other Web3 providers), and `AccountPfiCreateDto` (PFI-held). Sub-accounts go to `POST /accounts/subaccounts`; PFI accounts to `POST /accounts/pfi`.
+4. **Transaction** — `TransactionType` enum is `Deposit` (fiat → stablecoin), `Withdrawal` (stablecoin → fiat), or `Exchange` (asset-to-asset swap inside a PFI account, via `POST /exchanges`).
 
 **Withdrawals also require a Payment Instruction** (bank account details) created against the identity *before* the transaction.
 
@@ -83,7 +83,7 @@ Identity  →  Compliance Check  →  Account  →  Transaction
 
 ## Common failure modes
 
-- **401 Unauthorized** after ~23 hours — access token expired. Refresh it. (Tokens last roughly a day; the exact value is in `expiresIn`.)
+- **401 Unauthorized** after ~24 hours — access token expired. Refresh it. (Tokens last roughly a day; the exact value is in `expiresIn`.)
 - **`instructions: null`** on deposit creation — KYC/KYB is still pending at the PFI. Fetch instructions later via `GET /transactions/{id}` or a webhook; do not retry the deposit.
 - **Compliance check stuck in `NotStarted`** — check `requiredExtras.acceptTermsOfService` and `missingFields` via `GET /identities/{id}/compliance-checks/{slug}/requirements`.
 - **Withdrawal sitting open** — the PFI hasn't received stablecoins at the returned `toAddress`, or the `fromAddress` doesn't match, or the chain is wrong.
@@ -103,6 +103,7 @@ Claude auto-loads skills based on what you're doing. You can also invoke them ma
 - `borderless-deposit-flow` — end-to-end on-ramp (fiat → stablecoin).
 - `borderless-withdrawal-flow` — end-to-end off-ramp including payment instructions and per-corridor `details` requirements.
 - `borderless-virtual-account-flow` — dedicated, named bank accounts that auto-convert any incoming fiat to stablecoin (recurring deposits, payroll funding, treasury).
+- `borderless-exchange-flow` — internal asset/fiat conversion inside a PFI account (`POST /exchanges`).
 - `borderless-webhook-verifier` — signature-verifying handlers in TS, Python, and Go.
 
 **Commands** (`.claude/commands/`):
