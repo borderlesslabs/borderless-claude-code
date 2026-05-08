@@ -4,6 +4,15 @@ A Claude Code workspace for building against the [Borderless](https://borderless
 
 This repo is both your first-run sandbox and a permanent toolbox — skills, slash commands, reference examples, and prompt templates you keep using as you build your integration.
 
+## Prerequisites
+
+- Node 20+ on your machine.
+- [Claude Code](https://claude.com/claude-code) installed and authenticated.
+- **Borderless sandbox client ID and secret.** Available on the Developers tab within your Borderless dashboard.
+- **Your sandbox org is provisioned to your project's scope.** Borderless configures the PFIs and corridors for your account before handover — you don't set them up yourself. To extend scope or adjust configuration, work with your Borderless contact.
+
+`/borderless-onboard` checks all of this and prompts for anything missing.
+
 ## Quick start
 
 ```bash
@@ -84,15 +93,6 @@ Operational reference content lives under `cookbook/`: the **error catalog** (ev
 4. **Move the toolbox into your app: `/borderless-install-into <path>`.** When you're ready to build the real integration, this command copies `CLAUDE.md`, the skills, and the flow commands into your own codebase. Claude then has the Borderless guardrails and mental model baked into every session you run inside your project. The runnable examples stay here in this repo as reference.
 5. **Audit before you ship: `/borderless-lint` and the `borderless-integration-reviewer` agent.** The lint command sweeps for the common anti-patterns (missing idempotency keys, hardcoded URLs, unverified webhook handlers, float arithmetic on amounts, leaked secrets). The reviewer agent does a Borderless-specific PR audit prioritized for fund-safety and webhook-verification issues — invoke it on your branch before merging anything that touches payments.
 6. **Cut over to production.** Walk `cookbook/sandbox-to-production.md` end-to-end before flipping credentials — endpoints are identical between sandbox and production, but compliance, document validation, transaction limits, and PFI routing all change. When something fails in production, `cookbook/error-catalog.md` maps every common sync error and async `pfiErrorMessage` to its cause and fix.
-
-## Prerequisites
-
-- Node 20+ on your machine.
-- [Claude Code](https://claude.com/claude-code) installed and authenticated.
-- **Borderless sandbox client ID and secret.** You should have received these at onboarding. If not, email `support@borderless.xyz`.
-- **Your sandbox org is provisioned to your project's scope.** Borderless configures the PFIs and corridors for your account before handover — you don't set them up yourself. To extend scope or adjust configuration, work with your Borderless contact.
-
-`/borderless-onboard` checks all of this and prompts for anything missing.
 
 ## What's in the repo
 
