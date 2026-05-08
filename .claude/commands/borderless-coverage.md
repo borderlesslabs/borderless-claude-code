@@ -79,7 +79,7 @@ Aggregation rules:
 - Sort alphabetically by country code, then by fiat, then by method.
 - Flag tag width is fixed at `[X/Y]` / `[X  ]` / `[  Y]` padding so asset columns align.
 
-For orgs with many countries (the default sandbox has 100+), the table will run long. Conclude with: `Use /borderless-coverage {CC} to drill down into a specific country.`
+If the org has many corridors configured, the table can run long — conclude with `Use /borderless-coverage {CC} to drill down into a specific country.`
 
 ### 5. Render — per-country output
 
@@ -102,7 +102,7 @@ If only one transaction type is configured, print only that section and say so e
 End with:
 
 ```
-Coverage read live from {BORDERLESS_BASE_URL}. If a corridor you need isn't listed, contact support@borderless.xyz — PFIs are provisioned server-side.
+Coverage read live from {BORDERLESS_BASE_URL}. PFIs and corridors are provisioned server-side to match your project's scope — to extend or adjust, work with your Borderless contact.
 ```
 
 ## Do not

@@ -34,38 +34,32 @@ Seven steps, driven by Claude. You answer a few yes/no questions; Claude does th
 
 In sandbox, deposits auto-reconcile without real fiat — the transaction walks through `Submitted → Pending → Processing → Completed` on its own over a few minutes. Check the [sandbox dashboard](https://sandbox-dashboard.borderless.xyz) to see it land.
 
-## See what corridors are available — `/borderless-coverage`
+## See what corridors are configured — `/borderless-coverage`
 
-Your sandbox org comes pre-configured by Borderless with PFI coverage across dozens of countries. `/borderless-coverage` reads the live API and shows you exactly what's available — countries, fiats, payment rails, stablecoins, and whether each corridor supports deposits, withdrawals, or both.
+Your sandbox org is provisioned to match the scope of your project — the corridors, fiats, and stablecoins your team needs. `/borderless-coverage` reads the live API and shows exactly what's configured: countries, fiats, payment rails, stablecoins, and whether each corridor supports deposits, withdrawals, or both.
 
-Pass a country code to scope: `/borderless-coverage US`, `/borderless-coverage BR`, etc.
+Pass a country code to drill down: `/borderless-coverage US`, `/borderless-coverage BR`, etc.
 
 ### Sample output
 
-Truncated — the default sandbox has 100+ countries, so the actual output is ~250 rows:
+Output reflects your org's configured scope — number of rows depends on how many corridors your team is using.
 
 ```
 Borderless coverage on this org
-  Deposits:     577 corridors across 71 countries
-  Withdrawals:  1,079 corridors across 107 countries
+  Deposits:     8 corridors across 3 countries
+  Withdrawals:  14 corridors across 5 countries
 
 Countries:
-  AE  AED  NPSS           [D/W]  USDC_BASE, USDC_ETHEREUM, USDC_POLYGON, USDC_SOLANA, USDT_ETHEREUM, USDT_POLYGON, USDT_SOLANA, USDT_TRON
-  AE  USD  Swift          [  W]  USDC_BASE, USDC_ETHEREUM, USDC_POLYGON, USDC_SOLANA, USDT_ETHEREUM, USDT_OPTIMISM, USDT_SOLANA, USDT_TRON
-  BR  BRL  PIX            [D/W]  USDC_ETHEREUM, USDC_POLYGON, USDT_ETHEREUM, USDT_POLYGON
-  CO  COP  PSE            [D/W]  USDC_BASE, USDC_ETHEREUM, USDC_POLYGON, USDT_ETHEREUM, USDT_POLYGON
-  DE  EUR  Sepa           [D/W]  USDC_BASE, USDC_ETHEREUM, USDC_POLYGON, USDC_SOLANA, USDT_ETHEREUM, USDT_POLYGON, USDT_SOLANA, USDT_TRON
-  KE  KES  MobileMoney    [D  ]  USDC_CELO, USDC_ETHEREUM, USDC_POLYGON, USDC_SOLANA, USDT_ETHEREUM, USDT_POLYGON, USDT_SOLANA, USDT_TRON
-  MX  MXN  SPEI           [D/W]  USDC_ETHEREUM, USDC_POLYGON, USDT_ETHEREUM, USDT_POLYGON
-  NG  NGN  BankTransfer   [D/W]  USDC_CELO, USDC_ETHEREUM, USDC_POLYGON, USDC_SOLANA, USDT_ETHEREUM, USDT_POLYGON, USDT_SOLANA, USDT_TRON
-  US  USD  ACH            [D/W]  ETH, USDC_BASE, USDC_ETHEREUM, USDC_OPTIMISM, USDC_POLYGON, USDC_SOLANA, USDT_ETHEREUM
-  US  USD  Wire           [D/W]  ETH, USDC_BASE, USDC_ETHEREUM, USDC_OPTIMISM, USDC_POLYGON, USDC_SOLANA, USDT_ETHEREUM
-  …
+  BR  BRL  PIX            [D/W]  USDC_ETHEREUM, USDC_POLYGON
+  CO  COP  PSE            [  W]  USDC_ETHEREUM, USDC_POLYGON
+  MX  MXN  SPEI           [D/W]  USDC_ETHEREUM, USDC_POLYGON
+  US  USD  ACH            [D/W]  USDC_BASE, USDC_ETHEREUM, USDC_POLYGON
+  US  USD  Wire           [D/W]  USDC_BASE, USDC_ETHEREUM, USDC_POLYGON
 
 Legend: D = deposit supported, W = withdrawal supported
 ```
 
-Flag column tells you at a glance: `[D/W]` = both directions, `[D  ]` = deposit-only, `[  W]` = withdrawal-only. Withdrawal coverage is typically ~2× deposit coverage on a provisioned org.
+Flag column tells you at a glance: `[D/W]` = both directions, `[D  ]` = deposit-only, `[  W]` = withdrawal-only.
 
 ## Flows covered
 
@@ -96,7 +90,7 @@ Operational reference content lives under `cookbook/`: the **error catalog** (ev
 - Node 20+ on your machine.
 - [Claude Code](https://claude.com/claude-code) installed and authenticated.
 - **Borderless sandbox client ID and secret.** You should have received these at onboarding. If not, email `support@borderless.xyz`.
-- **Your sandbox org comes pre-configured with PFI coverage.** Borderless provisions PFIs server-side before your sandbox account is handed over — you don't configure them yourself. If a corridor you need isn't in `/borderless-coverage`, contact `support@borderless.xyz`.
+- **Your sandbox org is provisioned to your project's scope.** Borderless configures the PFIs and corridors for your account before handover — you don't set them up yourself. To extend scope or adjust configuration, work with your Borderless contact.
 
 `/borderless-onboard` checks all of this and prompts for anything missing.
 
