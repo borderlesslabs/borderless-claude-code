@@ -77,7 +77,7 @@ The toolbox auto-loads context for the six core Borderless flows. Each has a ded
 | **Compliance** | Onboard a personal or business identity, run KYC/KYB for a corridor, handle ToS acceptance, upload documents | `borderless-compliance-flow` |
 | **Deposit** (on-ramp) | One-off fiat → stablecoin transfers via ACH, Wire, PIX, SPEI, etc. | `borderless-deposit-flow` |
 | **Withdrawal** (off-ramp) | Stablecoin → fiat to a customer's bank account. Includes the per-corridor `details` table covering 18+ corridors and the seven `details` DTO variants | `borderless-withdrawal-flow` |
-| **Virtual accounts** | Dedicated, named bank accounts that auto-convert any incoming fiat to stablecoin — recurring deposits, payroll funding, treasury, per-customer attribution | `borderless-virtual-account-flow` |
+| **Virtual accounts** | Named bank accounts created in the identity's name with stable deposit instructions for recurring first-party funding — the end user moves fiat from their own external accounts on a recurring basis without a per-deposit API call. First-party only; not for third-party collection. | `borderless-virtual-account-flow` |
 | **Webhooks** | Signed event delivery: signature verification (TS/Python/Go), idempotency on event `id`, auto-disable handling, the `WebhookEventEntity` delivery log | `borderless-webhook-verifier` |
 
 Operational reference content lives under `cookbook/`: the **error catalog** (every common sync 4xx and async PFI failure mapped to cause and fix, plus the full `TransactionStatus` and `ComplianceStatus` enums), the **sandbox-to-production checklist**, **reconciliation** (including the `/reconciliation/items` and `/orphaned-transactions` endpoints), webhook replay, amount-handling rules, and local compliance testing.

@@ -1,13 +1,13 @@
 ---
 name: borderless-virtual-account-flow
-description: Use when building or debugging Borderless virtual accounts — dedicated, named bank accounts that automatically convert any incoming fiat into stablecoin without a per-deposit API call. Triggers on mentions of virtual accounts, dedicated bank accounts, recurring deposits, payroll funding, treasury auto-conversion, or named accounts in a Borderless context.
+description: Use when building or debugging Borderless virtual accounts — named bank accounts created in the identity's name with stable deposit instructions for recurring first-party funding (the end user transferring fiat from their own external accounts). Triggers on mentions of virtual accounts, named accounts, recurring deposits, or first-party funding in a Borderless context.
 ---
 
 # Borderless Virtual Account Flow
 
-A virtual account is a **dedicated, named bank account** provisioned by the PFI in your business's name. Any fiat sent to it is automatically converted into the configured stablecoin and credited to the linked Borderless account — no per-funding `POST /deposits` call required.
+A virtual account is a **named bank account** created by the PFI in the identity's name (sometimes called a "named account"). It keeps the **same deposit instructions** — routing number, account number, etc. — across many funding events, so the end user can move fiat from their own external accounts on a recurring basis without a `POST /deposits` call each time. Funds are auto-converted to the configured stablecoin and credited to the linked Borderless account.
 
-Use this when you need recurring deposits, per-customer funding addresses, or treasury auto-conversion. For one-time or infrequent deposits, the standard deposit flow (`borderless-deposit-flow`) is simpler.
+**First-party only.** Virtual accounts are designed for deposits from accounts registered to the **same end user** as the identity that owns the VA. They do not generally accept deposits from third parties — funds sent by a different person or business may be rejected or held by the PFI. If you need third-party collection (one VA receiving from many senders), use the standard deposit flow with per-transaction reference messages.
 
 **Prerequisites:** A compliant identity for the corridor + an account that already holds the target stablecoin asset. The asset must be added to the account **before** creating the virtual account.
 
@@ -15,11 +15,12 @@ Use this when you need recurring deposits, per-customer funding addresses, or tr
 
 | | Standard `POST /deposits` | Virtual account |
 |---|---|---|
-| Bank details visible to the originator | Generic PFI omnibus account + unique reference code | Dedicated account in your business name |
-| Reference / memo required from sender | **Yes** — `depositMessage` is the attribution key | **No** — the account number itself attributes the funds |
-| Per-funding API call | `POST /deposits` for each | None — fund as many times as you want |
+| Bank details visible to the sender | Generic PFI omnibus account + unique reference code | Named account in the identity's name |
+| Reference / memo required from sender | **Yes** — `depositMessage` is the attribution key | **No** — the account number itself is the identifier |
+| Per-funding API call | `POST /deposits` for each | None — same instructions reused across all fundings |
 | Per-funding transaction record | Created by your call | Created automatically when funds arrive |
-| Best for | One-off transfers | Recurring funding, per-customer accounts, payroll, treasury |
+| Sender model | One-time or third-party deposits supported | **First-party only** — same end user moving from their own external accounts |
+| Best for | One-off transfers, third-party collection | Recurring first-party funding (e.g. end user repeatedly moving from their own bank to their Borderless account) |
 
 ## The flow
 
@@ -106,8 +107,8 @@ When `Active`, `depositInstructions` is an array — one entry per supported rai
 
 **Critical differences from a standard deposit's `depositInstruction`:**
 
-- The account is in **your** name, not the PFI's omnibus name. Surface this to the sender accurately.
-- There is **no `depositMessage`** / reference code. The account number is the attribution key. Including a reference is harmless but unnecessary.
+- The account is in the **identity's** name (a "named account"), not the PFI's omnibus name. Surface this to the end user accurately — the sender must be the same person/entity, since these are first-party-only.
+- There is **no `depositMessage`** / reference code. The account number is the identifier. Including a reference is harmless but unnecessary.
 - Funds sent to this account auto-convert to the configured `asset` and credit the linked Borderless account.
 
 **`VirtualAccountEntity` field caveat:** the entity carries both `depositInstructions` (the typed array shown above) and a deprecated `instructions` field (flatter snake_case shape, kept for backward compat). New code should read `depositInstructions`.
@@ -135,19 +136,20 @@ DELETE /accounts/{accountId}/virtual-accounts/{vaId}  → Close (irreversible)
 
 ## Hard rules
 
-1. **Add the asset to the account first.** Creating a VA against an asset the account doesn't hold fails immediately.
-2. **Compliance must be approved before creation.** A VA created against an identity whose compliance later rejects can land in `Rejected` and is not recoverable — close it and create a fresh one.
-3. **Never reuse the bank details across customers.** Each customer / use case should get its own VA. The whole point is per-purpose attribution.
+1. **First-party only.** Funds must come from accounts registered to the same end user as the identity that owns the VA. Third-party deposits (a different person or business sending money in) are not generally supported and may be rejected or held by the PFI.
+2. **Add the asset to the account first.** Creating a VA against an asset the account doesn't hold fails immediately.
+3. **Compliance must be approved before creation.** A VA created against an identity whose compliance later rejects can land in `Rejected` and is not recoverable — close it and create a fresh one.
 4. **`Rejected` is terminal.** No retry on the same VA. Create a new one after fixing the underlying cause.
 5. **Deletion is irreversible.** Closing a VA permanently invalidates the bank details. Any in-flight wires sent to a closed VA may be returned.
 
 ## Common pitfalls when generating code
 
-- **Treating `depositInstructions` as guaranteed populated on creation.** It's empty until activation. Build the UI / customer email around the polled-or-webhooked active state.
+- **Treating VAs as a per-customer attribution mechanism.** They're not. A VA belongs to one identity and is meant for that end user's own incoming transfers from their own external accounts. If you need per-vendor / per-customer / per-invoice attribution, use `POST /deposits` with reference messages, or create separate identities per counterparty.
+- **Treating `depositInstructions` as guaranteed populated on creation.** It's empty until activation. Build the UI / end-user email around the polled-or-webhooked active state.
 - **Generating a `depositMessage` to "be safe".** There is none for VAs. Don't surface a placeholder — confuses the sender, and a real bank may reject the wire.
-- **One VA per identity.** It's not the model. You can create many VAs per account, scoped by `counterPartyIdentityId`. Use this to give each customer / vendor / payroll batch its own funding address.
 - **Forgetting that VA deposits flow through the standard deposit lifecycle.** They emit `Transaction_Updated` webhooks just like `POST /deposits` did. If your dedupe / handling assumes only API-initiated deposits, VA traffic will surprise you.
-- **Skipping the activation check before sharing bank details.** Surfacing a `NotActive` VA's empty details to a customer is an embarrassing UX failure. Wait for `Active`.
+- **Skipping the activation check before sharing bank details.** Surfacing a `NotActive` VA's empty details to the end user is an embarrassing UX failure. Wait for `Active`.
+- **Letting the end user share VA details with third parties.** The PFI may reject inbound transfers whose sender doesn't match the identity name on file. Make the first-party-only constraint explicit in your UX.
 
 ## Testing on sandbox
 

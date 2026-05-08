@@ -102,7 +102,7 @@ Claude auto-loads skills based on what you're doing. You can also invoke them ma
 - `borderless-compliance-flow` — identity creation, requirements discovery, document upload, starting a compliance check.
 - `borderless-deposit-flow` — end-to-end on-ramp (fiat → stablecoin).
 - `borderless-withdrawal-flow` — end-to-end off-ramp including payment instructions and per-corridor `details` requirements.
-- `borderless-virtual-account-flow` — dedicated, named bank accounts that auto-convert any incoming fiat to stablecoin (recurring deposits, payroll funding, treasury).
+- `borderless-virtual-account-flow` — named bank accounts in the identity's name with stable deposit instructions for recurring first-party funding (end user transferring from their own external accounts; third-party deposits not generally supported).
 - `borderless-webhook-verifier` — signature-verifying handlers in TS, Python, and Go.
 
 **Commands** (`.claude/commands/`):
