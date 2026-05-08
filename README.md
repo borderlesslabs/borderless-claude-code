@@ -78,7 +78,6 @@ The toolbox auto-loads context for the six core Borderless flows. Each has a ded
 | **Deposit** (on-ramp) | One-off fiat → stablecoin transfers via ACH, Wire, PIX, SPEI, etc. | `borderless-deposit-flow` |
 | **Withdrawal** (off-ramp) | Stablecoin → fiat to a customer's bank account. Includes the per-corridor `details` table covering 18+ corridors and the seven `details` DTO variants | `borderless-withdrawal-flow` |
 | **Virtual accounts** | Dedicated, named bank accounts that auto-convert any incoming fiat to stablecoin — recurring deposits, payroll funding, treasury, per-customer attribution | `borderless-virtual-account-flow` |
-| **Exchange** | Internal asset/fiat conversion inside a PFI account (asset↔asset, asset↔fiat, fiat↔fiat) without a deposit or withdrawal | `borderless-exchange-flow` |
 | **Webhooks** | Signed event delivery: signature verification (TS/Python/Go), idempotency on event `id`, auto-disable handling, the `WebhookEventEntity` delivery log | `borderless-webhook-verifier` |
 
 Operational reference content lives under `cookbook/`: the **error catalog** (every common sync 4xx and async PFI failure mapped to cause and fix, plus the full `TransactionStatus` and `ComplianceStatus` enums), the **sandbox-to-production checklist**, **reconciliation** (including the `/reconciliation/items` and `/orphaned-transactions` endpoints), webhook replay, amount-handling rules, and local compliance testing.
@@ -94,7 +93,7 @@ Operational reference content lives under `cookbook/`: the **error catalog** (ev
 
 ## What's in the repo
 
-- `.claude/skills/` — six flow skills (compliance, deposit, withdrawal, virtual accounts, exchange, webhooks) that Claude auto-loads when relevant. The withdrawal skill includes a per-corridor table of required and forbidden payment-instruction fields plus the seven `details` DTO variants the API accepts.
+- `.claude/skills/` — five flow skills (compliance, deposit, withdrawal, virtual accounts, webhooks) that Claude auto-loads when relevant. The withdrawal skill includes a per-corridor table of required and forbidden payment-instruction fields plus the seven `details` DTO variants the API accepts.
 - `.claude/commands/` — slash commands: `/borderless-onboard`, `/borderless-coverage`, `/borderless-scaffold`, `/borderless-lint`, `/borderless-test-webhook`, `/borderless-install-into`.
 - `.claude/agents/borderless-integration-reviewer.md` — a reviewer subagent you invoke for PR audits.
 - `examples/` — five runnable TypeScript references that chain: `compliance-personal/` → `account-setup/` → `deposit-us-ach-to-usdc/` → `withdrawal-usdc-to-us-ach/`, plus a standalone `webhooks/` Express handler. Each prints the env-var values the next step needs.

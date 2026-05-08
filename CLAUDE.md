@@ -60,7 +60,7 @@ Identity  →  Compliance Check  →  Account  →  Transaction
 1. **Identity** — a `Personal` or `Business` entity. Created once, reused forever. Holds PII and documents.
 2. **Compliance Check** — a KYC/KYB process tied to a specific `{PFI, country, asset, fiat, paymentMethod, type}` combination, identified by a `slug`. The same identity can have multiple compliance checks for different corridors.
 3. **Account** — the funds-holding structure tied to an identity. Typically a stablecoin wallet (Fireblocks, Utila, Dfns, Standalone, etc.) or a PFI-held fiat balance. The `POST /accounts` body is a `oneOf` over infra-specific create DTOs: `AccountStandaloneCreateDto` (you control the wallet, just declare addresses), `AccountUtilaCreateDto` (Utila vault + walletId), `AccountDfnsCreateDto`, `AccountWeb3ProviderCreateDto` (other Web3 providers), and `AccountPfiCreateDto` (PFI-held). Sub-accounts go to `POST /accounts/subaccounts`; PFI accounts to `POST /accounts/pfi`.
-4. **Transaction** — `TransactionType` enum is `Deposit` (fiat → stablecoin), `Withdrawal` (stablecoin → fiat), or `Exchange` (asset-to-asset swap inside a PFI account, via `POST /exchanges`).
+4. **Transaction** — `TransactionType` is `Deposit` (fiat → stablecoin) or `Withdrawal` (stablecoin → fiat). The enum also includes `Exchange` (PFI-internal conversion) but it's only applicable to one specific PFI's accounts and isn't part of the general toolbox.
 
 **Withdrawals also require a Payment Instruction** (bank account details) created against the identity *before* the transaction.
 
@@ -103,7 +103,6 @@ Claude auto-loads skills based on what you're doing. You can also invoke them ma
 - `borderless-deposit-flow` — end-to-end on-ramp (fiat → stablecoin).
 - `borderless-withdrawal-flow` — end-to-end off-ramp including payment instructions and per-corridor `details` requirements.
 - `borderless-virtual-account-flow` — dedicated, named bank accounts that auto-convert any incoming fiat to stablecoin (recurring deposits, payroll funding, treasury).
-- `borderless-exchange-flow` — internal asset/fiat conversion inside a PFI account (`POST /exchanges`).
 - `borderless-webhook-verifier` — signature-verifying handlers in TS, Python, and Go.
 
 **Commands** (`.claude/commands/`):
