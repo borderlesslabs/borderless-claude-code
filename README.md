@@ -11,8 +11,6 @@ This repo is both your first-run sandbox and a permanent toolbox — skills, sla
 - **Borderless sandbox client ID and secret.** Available on the Developers tab within your Borderless dashboard.
 - **Your sandbox org is provisioned to your project's scope.** Borderless configures the PFIs and corridors for your account before handover — you don't set them up yourself. To extend scope or adjust configuration, work with your Borderless contact.
 
-`/borderless-onboard` checks all of this and prompts for anything missing.
-
 ## Quick start
 
 ```bash
