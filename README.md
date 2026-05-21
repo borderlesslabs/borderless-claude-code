@@ -35,7 +35,7 @@ Seven steps, driven by Claude. You answer a few yes/no questions; Claude does th
 2. **Authenticate** — `POST /auth/m2m/token`. Proves your credentials before anything else.
 3. **Pick a corridor** — a `{country, fiat, asset, paymentMethod}` tuple. Claude proposes a default based on what your org has configured; change it to any of the other options. Run `/borderless-coverage` to see the full list.
 4. **Identity + compliance** — creates a Personal identity with placeholder PII, discovers the compliance slug for the corridor, handles Terms-of-Service acceptance if the partner requires it, starts the KYC check, polls to terminal.
-5. **Account** — creates a Standalone account with the corridor's stablecoin attached. (Production wallets — Fireblocks, Utila, Dfns, Circle — swap in via their own account-creation flows.)
+5. **Account** — creates a Standalone account with the corridor's stablecoin attached. (Production wallets — Fireblocks, Utila, Dfns — swap in via their own account-creation flows.)
 6. **Deposit** — shows a quote, creates the deposit, polls until the returned payment instructions populate, prints them verbatim for the originator.
 7. **Persist state** — writes IDs to `.borderless-onboard.json` so you can resume idempotently if anything times out.
 
