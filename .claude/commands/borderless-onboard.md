@@ -76,38 +76,40 @@ No problem. Whenever you're ready:
 
 ## Step 3 — PFI + corridor
 
-Fetch the configured PFIs on this sandbox organization:
+Fetch the **active** provider network on this sandbox organization — this is the authoritative read of what the org can do right now (configured-but-inactive providers are excluded):
 
 ```bash
-curl -sS "$BORDERLESS_BASE_URL/integrations-config" \
+curl -sS "$BORDERLESS_BASE_URL/organizations/network?status=active" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-Parse the response and extract the list of configured PFIs. Summarize (not full JSON):
+Each element is an active provider with `options` per operation type (`deposit` / `withdrawal`), carrying `assets: [{asset, countries[]}]` and `fiats: [{fiat, paymentMethods: [{method, countries[]}]}]`. Summarize (not full JSON):
 
 ```
-Configured PFIs on your sandbox org:
-  1. Bridge    (US/USD/ACH, US/USD/WIRE)
-  2. Bitso     (MX/MXN/SPEI, BR/BRL/PIX)
+Active providers on your sandbox org:
+  1. Bridge    (deposits: US/USD/ACH, US/USD/Wire · withdrawals: US/USD/ACH, US/USD/Wire)
+  2. Bitso     (deposits: MX/MXN/SPEI, BR/BRL/PIX · …)
   ...
 ```
 
+Do **not** infer coverage from `GET /organizations/integrations/config-info` — `isConfigured: true` does not mean a provider is active (see `cookbook/discovery.md`).
+
 If the call returns non-200 or the list is empty, fall back to this hardcoded list and say so:
 
-> Couldn't read `/integrations-config` — falling back to the standard PFI list. If none of these are configured on your org, the subsequent calls will fail. Contact support@borderless.xyz to configure PFI credentials.
+> Couldn't read `/organizations/network` — falling back to the standard PFI list. If none of these are active on your org, the subsequent calls will fail. Contact support@borderless.xyz to configure PFI credentials.
 >
 > Bridge, Bitso, Yellowcard, Trace Finance, Finity, HoneyCoin, Koywe, Walapay, Infinia, KotaniPay.
 
 Ask the customer which PFI to use. Default to **Bridge** if they don't express a preference — it's the most common sandbox starting point.
 
-Then fetch the supported corridors, scoped to the PFI's country. **Always pass `country=` — the unfiltered call pages/truncates and hides common countries like US:**
+Then fetch the supported deposit corridors, scoped to the PFI's country. **Always pass `country=` — the unfiltered call pages/truncates and hides common countries like US:**
 
 ```bash
 curl -sS "$BORDERLESS_BASE_URL/deposits/options?country=$COUNTRY" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-(Use `/deposits/countries` to list which country codes are configured on the org.)
+Cross-check the chosen `{fiat, method, asset}` against the active-network response from the start of this step — `/deposits/options` also lists configs belonging to inactive providers, and an asset that only an inactive provider serves will fail at transaction time.
 
 Pick the first corridor that matches the PFI — e.g., for Bridge, `{country: US, fiat: USD, asset: USDC_POLYGON, paymentMethod: ACH}`. Note: `method` values in the response use the casing the API expects back (`ACH`, `Wire`, `Sepa`, `PIX`, `SPEI`, `PSE`, `EFT`, `MobileMoney`, `BankTransfer`) — pass them through unchanged. Summarize and offer to change:
 

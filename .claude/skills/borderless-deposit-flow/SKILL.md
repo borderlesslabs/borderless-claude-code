@@ -27,6 +27,8 @@ GET /deposits/options?country={CC}
 
 Returns an array of `{id, country, fiat, method, asset}` items (note: `method`, not `paymentMethod`). Filter client-side to the `{fiat, method}` you want. Empty result for the corridor = not configured for your org. **Always pass `country=`** — the unfiltered `/deposits/options` paginates and frequently drops common countries (US in particular).
 
+**Options ≠ availability.** `/options` reflects configured ramp configs, including providers that are currently inactive on your org. Validate the corridor and asset against `GET /organizations/network?status=active` before building — full endpoint ladder in `cookbook/discovery.md`.
+
 **Deposits and withdrawals have separate PFI configurations.** A corridor that works for withdrawals on your org may not be enabled for deposits, and vice versa. If `/deposits` later fails with "Invalid provider" or "Failed to create deposit payment", the on-ramp side is not provisioned even though the corridor showed up — contact support.
 
 `GET /deposits/institutions?country=&fiat=&paymentMethod=` exists with the same shape as the withdrawals variant (`{allInstitutionsSupported, institutionIdentifier, supportedInstitutions, country, fiat, paymentMethod}`). For most deposit corridors you don't need to call it — the originator sends fiat to bank details Borderless returns after submission. The exception is corridors where the deposit involves a `paymentInstructionId` (mobile money, some LATAM rails) — there you'll need a PI created in advance, and `/deposits/institutions` is the discovery for that PI.

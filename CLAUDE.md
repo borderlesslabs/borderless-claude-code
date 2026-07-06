@@ -77,7 +77,9 @@ Identity  →  Compliance Check  →  Account  →  Transaction
 7. **Withdrawals: `fromAddress`, `amount`, `toAddress`, and asset+chain must all match** the PFI's `withdrawalOnchainInstruction` before broadcasting. Lost stablecoins are not refundable.
 8. **Respect the ToS flow.** Some PFIs require the end user to accept a terms-of-service link (`metadata.tosLink`) before compliance can start. Check `metadata.hasAcceptedTos` before initiating.
 9. **PII handling.** Identity documents contain sensitive PII. Do not log full payloads. Redact `taxId`, `imageFront`, `imageBack`, `dateOfBirth`, and address fields at log boundaries.
-10. **Amounts are decimal strings, never `Number` / `float`.** Use `decimal.js` in TS, `Decimal` in Python, `shopspring/decimal` in Go.
+10. **Amounts are decimal strings, never `Number` / `float`.** Use `decimal.js` in TS, `Decimal` in Python, `shopspring/decimal` in Go. On withdrawals, `amount` is denominated in the **source asset** (e.g. USDC); on deposits, in the **fiat**. Per-corridor caps are usually expressed in fiat — convert before comparing.
+11. **Never submit a transaction before compliance is `Approved` or `PreApproved`** for the corridor — `Started` and `UnderReview` are not sufficient, and the failed transaction is terminal (`Compliance workflow was cancelled`). This includes **every owner/UBO personal identity**, not just the business identity: some PFIs onboard each owner as their own customer with their own ToS + compliance check. If a compliance gate is blocking, fix the gate — don't submit "to see what happens".
+12. **Validate corridors against active providers, not configured ones.** `GET /organizations/network?status=active` is authoritative for what your org can do; `/withdrawals/options` and `/deposits/options` also reflect configs of currently-inactive providers, and `config-info.isConfigured` does not imply active. See `cookbook/discovery.md`.
 
 ---
 
@@ -89,8 +91,9 @@ Identity  →  Compliance Check  →  Account  →  Transaction
 - **Withdrawal sitting open** — the PFI hasn't received stablecoins at the returned `toAddress`, or the `fromAddress` doesn't match, or the chain is wrong.
 - **Webhook marked `enabled: false`** — delivery exhausted its retry budget. Your endpoint returned non-200 or errored. Re-enable via `PATCH /notifications/webhooks/settings/{id}`. See `cookbook/webhook-replay.md`.
 - **`Validation error from PFI` with no detail on retry** — the previous attempt tainted the payment instruction on the PFI side. Create a fresh PI and resubmit. See `cookbook/error-catalog.md`.
+- **Asset appears in `/options` but the transaction fails** ("No suitable ramp config", asset mismatch) — the asset came from an inactive provider's config. Validate against `GET /organizations/network?status=active`. See `cookbook/discovery.md`.
 
-For a full message → cause → fix table (sync 4xx and async PFI failures), see `cookbook/error-catalog.md`.
+For a full message → cause → fix table (sync 4xx and async PFI failures), see `cookbook/error-catalog.md`. When a failure names a specific PFI (`pfiName` on the transaction), check that provider's page under `providers/` for its known message signatures.
 
 ---
 
@@ -150,9 +153,15 @@ Each example is a standalone TypeScript project. The `FORK HERE` comment on the 
 
 ## Cookbook
 
+- `cookbook/discovery.md` — the endpoint ladder for validating what your org can actually do (start here before building any corridor).
 - `cookbook/amount-handling.md` — decimal types, never floats.
 - `cookbook/error-catalog.md` — sync + async error message → cause → fix.
 - `cookbook/reconciliation.md` — recovering after a webhook gap.
 - `cookbook/sandbox-to-production.md` — checklist before flipping to production.
 - `cookbook/testing-compliance-locally.md` — running compliance flows in dev.
 - `cookbook/webhook-replay.md` — re-enabling an auto-disabled webhook.
+
+## Provider notes and corridor data
+
+- `providers/` — per-PFI integration notes (compliance style, identity fields, PI shapes, message signatures). Keyed by the `pfiName` you see on transactions and compliance checks. For debugging — never branch integration logic on `pfiName`.
+- `data/corridors.json` — machine-readable snapshot of per-corridor payment-instruction requirements (mirrors the withdrawal skill's table; live discovery is authoritative).

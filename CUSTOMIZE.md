@@ -7,6 +7,7 @@ What to edit, what to leave alone, what to delete. This repo is meant to be fork
 These are the Borderless guardrails. Changing them usually means breaking a hard rule the integration reviewer will flag:
 
 - **`.claude/skills/`** — the four flow skills. They encode the correct API sequence and failure modes for compliance, deposit, withdrawal, and webhooks.
+- **`providers/` and `data/corridors.json`** — verified integration observations with provenance dates. If your org's live behavior disagrees, trust the live signal and report it to support@borderless.xyz rather than editing.
 - **`.claude/agents/`** — the `borderless-integration-reviewer` subagent.
 - **`.claude/commands/`** — the existing slash commands. Add new ones freely; don't modify the shipped ones.
 - **`.mcp.json`** — the fetch MCP server lets Claude pull docs pages on demand. The optional OpenAPI bridge is commented out — uncomment to expose the sandbox API as callable tools during development.

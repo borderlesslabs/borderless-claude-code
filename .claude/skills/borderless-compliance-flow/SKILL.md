@@ -30,6 +30,13 @@ Pick the right type:
 - **Personal** — natural persons, including UBOs, directors, signers. KYC.
 - **Business** — legal entities. KYB. Typically includes `ultimateBeneficialOwners` (UBOs) which may reference existing personal identities by `personalIdentityId` or inline a new personal identity via `personalIdentity`.
 
+**Choosing the archetype:** the real compliance matrix is **provider × country × customer type** — requirements differ along all three axes. Two patterns that matter:
+
+- **Consumer / end-user flows → model end users as personal identities.** Personal KYC often approves automatically in sandbox where business KYB includes review steps. If your product off-ramps for individual end users, create each as `POST /identities/personal` with their own account and payment instruction — don't funnel them through one corporate identity.
+- **Local residents carry local KYC requirements.** An identity resident in the destination country can require country-specific documents that a foreign identity doesn't (e.g. Nigeria: `BVN_NG` + `NationalId` for NG-resident individuals; some PFIs require `citizenship` on the person). The `requirements` endpoint is per-identity — query it for **each** identity rather than generalizing from the first one.
+
+**UBO structure (business identities):** each UBO must be a separate personal identity referenced by `personalIdentityId` — inline names are rejected. Required companions: `controlPersonTitle` when `hasControl: true`, `ownershipPercentage` when `hasOwnership: true`, and `attestedOwnershipStructureAt` as a real `YYYY-MM-DD` date (not null).
+
 ```bash
 POST /identities/personal
 # or
@@ -41,6 +48,12 @@ Headers:
 ```
 
 **Capture `id` from the response** — you'll need it for every subsequent call.
+
+**Creation and update semantics (all identity types):**
+
+- `POST /identities/business` **always creates** a new identity, even with a duplicate email — it does not upsert. Include every provider-required field at creation time; if you miss one, update with PATCH rather than creating a second identity.
+- The update path includes the type: `PATCH /identities/business/{id}` or `PATCH /identities/personal/{id}`. The bare `PATCH /identities/{id}` (and `PUT`) return 404.
+- **PATCH is atomic** — one invalid field 422s the whole body and *nothing* persists. A classic trap: enriching an identity where the UBO object omits `ownershipPercentage` (required when `hasOwnership: true`) silently leaves *every* field in the request unsaved, and compliance later fails on "missing" fields you thought you set. **Check the PATCH response contains the identity `id`** (i.e. it's the updated entity, not an error body) before moving on.
 
 ### 2. Discover available PFIs for the corridor
 
@@ -59,6 +72,8 @@ Key response fields:
 - `metadata.hasAcceptedTos` — boolean confirming acceptance.
 - `coverage` — the corridors this slug unlocks.
 
+**Null-slug checks are still real checks.** Some providers' checks appear with `slug: null` but a populated `type` (e.g. a `{Provider}_base` type). A null slug does **not** mean "no check needed" — transactions fail until the check is `Approved`. Drive these **by type**: the `{slug}` path parameter accepts the compliance type string for both `GET .../compliance-checks/{type}/requirements` and `POST .../compliance-checks/{type}`. Rule of thumb: `ref = slug ?? type` for every compliance-check call.
+
 ### 3. Check required documents and fields
 
 ```bash
@@ -72,6 +87,8 @@ Key response fields:
 - `requiredExtras.acceptTermsOfService.link` — ToS URL if applicable.
 
 Use this to drive your UI. Only ask the end user for what this endpoint says is required.
+
+**Caveat — an all-clear requirements response doesn't guarantee initiation succeeds.** `requirements` reflects Borderless-side readiness. Some PFI-side validations (notably document image dimensions/content quality) only run at initiation, when the PFI creates its customer record. If initiation fails with a generic customer-creation error while `missingFields`, `requiredDocuments`, and `requiredExtras` are all empty, suspect document image quality first — upload realistic, high-resolution images (≥1200×900 has been verified where 300×300 placeholders were declined) and re-initiate. See `providers/` for provider-specific validation notes.
 
 ### 4. Upload documents
 
@@ -92,6 +109,12 @@ Body: {
 
 Documents persist on the identity. If the same identity later needs compliance with a different PFI that accepts the same doc type, you don't re-upload.
 
+Notes:
+
+- `DriverLicense` requires **both** `imageFront` and `imageBack`. Metadata-only uploads (no image) create the record but fail at compliance initiation.
+- Document `issuingCountry` should match the identity's `address.country`.
+- **Reading documents back:** `GET /identities/{id}/documents` returns `[]` even when documents exist. Uploaded documents live on the identity object — `GET /identities/{id}` → `.documents`.
+
 ### 5. Confirm ToS acceptance
 
 If step 2 returned `metadata.tosLink`, the end user must visit that link and accept. Re-fetch the compliance check and confirm `metadata.hasAcceptedTos === true` before proceeding.
@@ -107,6 +130,23 @@ Headers: Authorization, Content-Type, idempotency-key
 ```
 
 Response returns `{ slug, status, metadata }`.
+
+## Owner identities have their own compliance checks
+
+For business identities, the compliance work doesn't stop at the business. **Some PFIs onboard each owner/UBO personal identity as its own customer** — the owner identity carries its *own* compliance checks (same provider, separate check), each needing its own ToS acceptance, document set, and initiation. Symptoms of skipping this: the business check looks fine but customer creation fails, or the business check parks at `AwaitingUbo`.
+
+The full loop for a business identity:
+
+```
+for identity in [business, ...each owner personal identity]:
+  1. GET  /identities/{id}/compliance-checks              → find checks (slug or type)
+  2. GET  .../compliance-checks/{ref}/requirements        → per-identity requirements
+  3. accept any ToS links (per identity — links are not shared)
+  4. POST .../compliance-checks/{ref}                     → initiate
+  5. poll until Approved / PreApproved
+```
+
+Owner identities can also carry fields the business identity doesn't accept — e.g. `citizenship` is set on the *personal* identity via `PATCH /identities/personal/{id}` (the business identity rejects it, and the field is `citizenship`, not `nationality`).
 
 ## Status values
 
@@ -131,7 +171,7 @@ Treat `NotStarted`, `Started`, `Incomplete`, `AwaitingUbo`, `UnderReview` as non
 - **Personal (KYC):** minutes to a few hours. Some PFIs are near-instant.
 - **Business (KYB):** 1–4 days typical.
 - **RFIs (Requests for Information):** 24–48 hours after the PFI asks. These are communicated manually. Watch for `incompleteReasons` or `rejectionReasons` in the compliance check response.
-- **Sandbox note:** Some sandbox PFIs (Bridge in particular) can park a newly-started check in `UnderReview` indefinitely. If you're waiting on a sandbox completion, set a hard timeout; don't block user-facing flows on it.
+- **Sandbox note:** Sandbox checks usually approve within seconds of initiation, but some PFIs spend **2–3 minutes** in `UnderReview` before flipping to `Approved` — poll for at least a few minutes before treating a check as stuck. A minority can park in `UnderReview` longer; set a hard timeout and don't block user-facing flows on it.
 
 ## Tracking status
 
@@ -155,8 +195,12 @@ See the `borderless-webhook-verifier` skill for signature verification.
 
 - **Skipping the requirements check.** Calling `POST /compliance-checks/{slug}` with missing fields or docs fails silently — the check starts but immediately blocks on `incompleteReasons`.
 - **Reusing a ToS link across identities.** Each identity needs a fresh acceptance.
+- **Completing a ToS acceptance without the redirect.** Where a PFI's ToS link is an interactive page, the redirect back to Borderless is what records the acceptance. Complete it in a real browser and let the redirect finish — don't call the callback URL directly.
 - **Treating `NotStarted` as an error.** It's the default state before step 6. Only `Rejected` and explicit `incompleteReasons` mean something is wrong.
+- **Treating a null slug as "no check".** Drive it by compliance type (see step 2).
+- **Driving compliance only on the business identity.** Owner/UBO identities can carry their own checks — see "Owner identities" above.
 - **Re-uploading documents on every compliance check.** Borderless persists them on the identity. Only upload once per unique document.
+- **Submitting transactions before every applicable check is `Approved`/`PreApproved`.** `Started` and `UnderReview` are not sufficient — the transaction fails terminally and must be recreated. Gate transaction submission on compliance state, and when the gate blocks, fix the gate.
 
 ## When generating code
 
