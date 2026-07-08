@@ -22,6 +22,10 @@ The async ones are the dangerous ones — your call returns 200, you assume succ
 | `404 Not Found` on `POST /identities` | The bare path doesn't exist | Use `POST /identities/business` or `POST /identities/personal`. |
 | `404 Not Found` on `PATCH /identities/{id}` | The bare PATCH path doesn't exist | Use `PATCH /identities/business/{id}` or `PATCH /identities/personal/{id}`. |
 | `422 street1 is required` (or unknown-field 422 on `addressLine1`) | Wrong address-line field name | First address line is `street1`. |
+| `422 ownershipPercentage is required when hasOwnership is true` | UBO object incomplete — and **PATCH is atomic**, so the whole update was discarded, including unrelated fields in the same body | Add `ownershipPercentage`, re-send the full PATCH, and confirm the response is the updated entity (has an `id`), not an error body. |
+| `422 citizenship should not exist` | `citizenship` sent on a business identity | It belongs on the *personal* identity: `PATCH /identities/personal/{id}`. (The field is `citizenship`, not `nationality`.) |
+| `Invalid subdivision code` | `address.state` is free text | Use ISO 3166-2 subdivision codes — including outside the US (e.g. Singapore: `01`–`05`). |
+| `GET /identities/{id}/documents` returns `[]` despite uploads | Wrong read path — documents don't surface on the sub-route | Read them from the identity object: `GET /identities/{id}` → `.documents`. |
 
 ### Quotes
 
@@ -74,7 +78,9 @@ See the country-by-country `details` table in the `borderless-withdrawal-flow` s
 | `supportingDocuments.0.file should not be empty` | Document uploaded with metadata only — no `imageFront` | Re-upload the document with the base64 image data. |
 | `Image must be at least 200x200 pixels` | Document image too small | Re-upload at ≥ 200×200 (300×300 to be safe). Some PFIs validate at compliance initiation, not at upload — the `PUT /documents` succeeds but the `POST /compliance-checks/{slug}` fails. |
 | `identity.document.idNumber: format is invalid` | Tax ID failed PFI validation (e.g., Argentina CUIT mod-11 check) | Use a valid local-format tax ID for the corridor's PFI. |
-| `identity.address.state: Unsupported subdivision` | PFI doesn't accept the identity's US state | Some PFIs restrict states. Move the identity's address to a supported state (e.g., Delaware) for sandbox, or split identities. |
+| `identity.address.state: Unsupported subdivision` | The identity's US state is outside the PFI's licensing coverage | Use a supported state (e.g., Delaware) for sandbox identities, or split identities. |
+| `compliance: Error creating customer.` / `Validation error from PFI` at compliance initiation, with `requirements` all-clear | PFI-side validation that runs at customer creation — most commonly document image dimensions/content quality; or an owner/UBO identity that hasn't completed its own compliance | Re-upload realistic, high-resolution document images (≥1200×900 verified), and drive compliance on every owner identity too. The `requirements` endpoint reflects Borderless-side readiness only. |
+| Compliance check shows `slug: null` and sits at `NotStarted` | Type-driven check — null slug does **not** mean "no check needed" | Use the compliance **type** as the path ref: `GET/POST /identities/{id}/compliance-checks/{type}`. |
 | `Validation error from PFI` (no details) on retry | Often a tainted PI — see "Tainted payment instructions" below | Create a fresh payment instruction and resubmit against it. |
 
 ### Webhooks
@@ -108,8 +114,9 @@ The transaction returned `Submitted`. You polled or got a webhook. `status` is n
 | `pfiErrorMessage` | Cause | Fix |
 |---|---|---|
 | `Compliance workflow was cancelled` | You submitted the transaction before compliance reached `Approved` / `PreApproved` | Wait for compliance to clear, then submit a fresh transaction. The cancelled one is terminal — don't retry it. |
-| `No suitable ramp config found for organization` | Corridor not provisioned for your org on the relevant side (deposits and withdrawals are configured separately) | Contact support@borderless.xyz. |
-| `Failed to validate if bank account belongs to …` | PFI verifies that the bank account is owned by the tax-ID holder (Koywe LATAM corridors do this) | Use a tax ID and bank account that match. In sandbox, you may need PFI-issued test credentials. |
+| `identity: Compliance check failed` | A required compliance check (possibly a null-slug/type-driven one, or one on an owner identity) never reached `Approved` | List checks on **every** identity involved; drive null-slug checks by type. See the compliance skill's "Owner identities" section. |
+| `No suitable ramp config found for organization` | Corridor not provisioned for your org on the relevant side (deposits and withdrawals are configured separately) — or the asset you chose came from an inactive provider's config | Validate against `GET /organizations/network?status=active` (see `cookbook/discovery.md`); if the corridor is genuinely missing, contact support@borderless.xyz. |
+| `Failed to validate if bank account belongs to …` | The PFI verifies destination-account ownership against the tax-ID holder — a protection against misdirected payouts (some LATAM corridors) | Use a tax ID and bank account that match. In sandbox, request PFI-issued test credentials via support. |
 
 ### Provider / corridor issues
 
@@ -117,6 +124,7 @@ The transaction returned `Submitted`. You polled or got a webhook. `status` is n
 |---|---|---|
 | `No suitable service` | Wrong `paymentMethod` for the corridor on this PFI | Re-discover via `/withdrawals/options`. |
 | `amount must be less than X USD` | Per-transaction limit hit | Reduce amount. Some corridors have low caps (e.g., NGN ≈ $3,164 USD per transaction). |
+| `Amount for {CCY} in {CC} is above maximum limit: N` | Per-transaction cap, quoted in destination fiat — but the withdrawal `amount` you sent is in the **source asset** (USDC) | Convert the fiat cap to source-asset units via a quote and stay under it (e.g. 100,000 TRY ≈ 2,900 USDC). |
 | `address unavailable` | PFI hasn't provisioned a sandbox deposit address for this corridor | Provider-side issue. Contact support. |
 | `partner rate does not exist` | Asset/currency pair not supported by the routed PFI | Try a different asset (e.g., switch from `USDT_TRON` to `USDC_ETHEREUM`). |
 | `omnibus not configured for organization` | Backend configuration missing | Contact support. |
@@ -185,7 +193,9 @@ This is true even when the underlying problem was on the identity, not the PI it
 
 ## Related
 
-- Withdrawal field requirements per corridor: `borderless-withdrawal-flow` skill, "Payment instruction `details` by corridor".
+- Withdrawal field requirements per corridor: `borderless-withdrawal-flow` skill, "Payment instruction `details` by corridor" (machine-readable mirror: `data/corridors.json`).
+- Per-provider message signatures: `providers/` — when a failure carries a `pfiName`, check that provider's page.
+- Corridor/asset validation before building: `cookbook/discovery.md`.
 - Compliance failure detail: `borderless-compliance-flow` skill.
 - Webhook delivery failures (auto-disable, replay): `cookbook/webhook-replay.md`.
 - Reconciling a gap from a missed-webhook window: `cookbook/reconciliation.md`.

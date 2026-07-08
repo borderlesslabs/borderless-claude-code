@@ -52,7 +52,7 @@ Two fields decide what your PI must contain:
 
 **Never cache bank slugs.** They are PFI-specific and become invalid the moment routing changes. Discover at runtime.
 
-**Options ≠ availability.** A corridor that appears in `/options` but errors with "No suitable service" on `/quotes` is not actually live for your org. Confirm with a quote before building against it.
+**Options ≠ availability.** `/options` reflects every ramp config on the org — including providers that are currently **inactive**. An asset or corridor appearing there is not proof a live provider serves it. Validate against `GET /organizations/network?status=active` (the authoritative capability read) and confirm with a quote before building against it. Full endpoint ladder: `cookbook/discovery.md`.
 
 
 
@@ -118,7 +118,7 @@ Payment instructions can be reused for repeat payouts to the same beneficiary. P
 
 The required and forbidden field sets differ by country and method. Forbidden fields produce 422 at PI creation; missing required fields often pass PI creation but fail the withdrawal asynchronously with a `pfiErrorMessage`.
 
-> The table below is a working snapshot drawn from observed integration behavior. The Borderless docs cover the most common corridors (US, UK, EU, BR, MX) explicitly; the long-tail corridors (AE/NPSS, IN/IMPS_FIRC, AU/BECS, etc.) are validated empirically and may shift if PFI routing changes. Always treat the live `/withdrawals/institutions` response as authoritative for the `institutionIdentifier` field, and the PFI's async `pfiErrorMessage` as authoritative for required fields you may have missed.
+> The table below is a working snapshot drawn from observed integration behavior. The Borderless docs cover the most common corridors (US, UK, EU, BR, MX) explicitly; the long-tail corridors (AE/NPSS, IN/IMPS_FIRC, AU/BECS, etc.) are validated empirically and may shift if PFI routing changes. Always treat the live `/withdrawals/institutions` response as authoritative for the `institutionIdentifier` field, and the PFI's async `pfiErrorMessage` as authoritative for required fields you may have missed. A machine-readable version of this table lives at `data/corridors.json` (update both together); per-provider behavior notes live under `providers/`.
 
 | Country / Method | Required `details` | Forbidden | Notes |
 |---|---|---|---|
@@ -133,6 +133,8 @@ The required and forbidden field sets differ by country and method. Forbidden fi
 | **MX / SPEI** | `bankName`, `accountHolderName`, `bankAccountNumber` (18-digit CLABE), `address` | — | The 18-digit CLABE goes in `bankAccountNumber`. |
 | **NG / BankTransfer** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber`, `address` | — | Discover the slug — provider-specific and not interchangeable across PFIs. Some PFIs cap per-transaction value (~$3,164 USD equiv). |
 | **AE / NPSS** | `iban`, `address` | `bankName`, `accountHolderName`, `bankAccountNumber` | One of the few corridors where the `iban` field name is correct. |
+| **EG / BankTransfer** | `bankSlug`, `iban`, `address` | `bankName`, `accountHolderName`, `bankAccountNumber` | IBAN-only shape like AE/NPSS, plus the discovered `bankSlug`. |
+| **TR / EFT** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber` (Turkish IBAN), `address` | — | ~100,000 TRY per-transaction cap — and `amount` is in source-asset units (≈2,900 USDC at 2026-06 rates), so convert before checking. |
 | **IN / IMPS_FIRC** | `bankAccountNumber`, `localRoutingCode` (IFSC), `bankName`, `accountHolderName`, `address` | `bankCode` (silently ignored), `localRoutingNumber` (rejected) | Withdrawals here also need a `documents: [{ type: "Invoice", content: "..." }]` on the withdrawal call (see step 2). `localRoutingCode` is accepted on creation but not echoed back in GET responses. |
 | **PH / BankTransfer** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber`, `address` | — | For e-wallets like GCash, the `bankAccountNumber` is the phone number. Discover the GCash slug. |
 | **ZA / EFT** | `bankSlug`, `bankName`, `accountHolderName`, `bankAccountNumber`, `address` | — | Method is `EFT`, not `BankTransfer`. |
@@ -164,7 +166,7 @@ Headers:
 Body:
 {
   "asset": "USDC_POLYGON",
-  "amount": "100.00",
+  "amount": "100.00",                       // in SOURCE-ASSET units (100 USDC), not destination fiat
   "accountId": "{sourceAccountId}",
   "paymentInstructionId": "{fromStep1}",
   "paymentPurpose": "personal remittance",  // REQUIRED. Enum — see list below.
@@ -185,6 +187,8 @@ Body:
 The `documents` array is required for invoice-corridor withdrawals (India, Ghana, China, and Brazil over 50,000 BRL). Supported formats: JPEG / PNG / PDF, base64 data URI, min 200×200 px, max 5 MB. Skipping it does not 422 — the withdrawal submits, then transitions to `Failed` with "please upload an invoice…".
 
 **`refundAddress`** is the crypto address Borderless will return funds to if the withdrawal fails or is rejected after you've broadcast the on-chain transfer. Defaults to the same address you sent from. Worth setting explicitly when your wallet infrastructure can spend from multiple addresses but you want refunds to a single sweep account.
+
+**`amount` is denominated in the source asset** (USDC/USDT), not the destination fiat. Per-corridor caps are usually expressed in fiat (e.g. 100,000 TRY, 30M NGN) or USD-equivalent — convert via a quote before comparing, and expect the cap error to quote either denomination.
 
 **`paymentPurpose` is required** — the PFI uses it for AML / travel-rule filings. Must be one of: `salary payment`, `personal remittance`, `rent payment`, `property purchase`, `owned account abroad`, `advertising expenses`, `advisory fees`, `business insurance`, `construction`, `delivery fees`, `education`, `exports`, `donation`, `hotel`, `loan payment`, `maintenance expenses`, `medical expense`, `office expenses`, `royalty fees`, `service charge`, `shares investment`, `tax payment`, `transportation fees`, `travel`, `utility bills`, `other`.
 
@@ -269,6 +273,11 @@ Only works from non-terminal early states (`Submitted`, `Verifying`, `Orchestrat
 ## Testing on sandbox
 
 Sandbox base URL: `https://sandbox-api.borderless.xyz/v1`. Use sandbox PFI test accounts — don't send real stablecoins to sandbox deposit addresses. Status transitions are simulated; `Transaction_Updated` webhooks fire as expected.
+
+Two habits that save time:
+
+- **Sandbox can simulate terminal outcomes on demand** — specific transaction amounts trigger `Completed`, `Failed`, and `Refunded` paths so you can exercise failure handling without engineering a real failure. See [Testing in Sandbox](https://docs.borderless.xyz/docs/sandbox-testing.md) for the trigger amounts.
+- **`Submitted` is not success.** Poll `GET /transactions/{id}` (or subscribe to webhooks) until a terminal status — corridors fail asynchronously with the real cause in `failureReason.details[].pfiErrorMessage`.
 
 ## Reference implementation
 

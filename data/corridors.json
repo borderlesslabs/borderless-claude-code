@@ -1,0 +1,251 @@
+{
+  "meta": {
+    "description": "Machine-readable snapshot of per-corridor payment-instruction requirements for Borderless withdrawals. Mirrors the 'Payment instruction details by corridor' table in .claude/skills/borderless-withdrawal-flow/SKILL.md — update both together.",
+    "authority": "This file is a working snapshot drawn from observed integration behavior. Live discovery is ALWAYS authoritative: GET /organizations/network?status=active for capability, GET /withdrawals/institutions for the institutionIdentifier field, and the PFI's async pfiErrorMessage for anything missed. See cookbook/discovery.md.",
+    "amountDenomination": "The withdrawal `amount` is denominated in the SOURCE asset (e.g. USDC), not destination fiat. perTransactionCap values below are expressed in the currency stated — convert before comparing.",
+    "scopeValues": {
+      "universal": "API contract, stable across orgs",
+      "provider-dependent": "Applies wherever the observed PFI routes the corridor",
+      "org-dependent": "Observed on some orgs, not others — re-verify on yours"
+    },
+    "lastUpdated": "2026-07"
+  },
+  "dtoVariants": {
+    "USDetailsCreateDto": "US ACH/Wire — bankRoutingNumber (ABA) + bankAccountType",
+    "BankDetailsCreateDto": "Most corridors — bankSlug, bankAccountNumber, optionally localRoutingCode",
+    "IbanBankDetailsIbanCreateDto": "IBAN-only corridors — iban",
+    "IdentifierDetailsCreateDto": "BR/PIX — identifierType + identifierValue",
+    "BrebKeyDetailsCreateDto": "CO/Bre-B — brebKey only",
+    "SepaDetailsCreateDto": "EU/SEPA — bankAccountNumber (full IBAN) + swiftOrBicNumber + accountOwnerType",
+    "MobileMoneyDetailsCreateDto": "Mobile-money corridors — phone + networkSlug"
+  },
+  "corridors": [
+    {
+      "country": "US", "fiat": "USD", "method": "ACH",
+      "dtoVariant": "USDetailsCreateDto",
+      "requiredDetails": ["bankName", "accountHolderName", "bankAccountNumber", "bankRoutingNumber", "bankAccountType", "address"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "bankAccountType is Checking or Savings.",
+      "verified": "2026-03", "scope": "provider-dependent"
+    },
+    {
+      "country": "US", "fiat": "USD", "method": "Wire",
+      "dtoVariant": "USDetailsCreateDto",
+      "requiredDetails": ["bankName", "accountHolderName", "bankAccountNumber", "bankRoutingNumber", "address"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "",
+      "verified": "2026-03", "scope": "provider-dependent"
+    },
+    {
+      "country": "GB", "fiat": "GBP", "method": "BankTransfer",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankName", "accountHolderName", "bankAccountNumber", "address"],
+      "forbiddenDetails": ["sortCode", "iban"],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "Some orgs validate bankAccountNumber as a UK IBAN (GB29...) — if a plain 8-digit account number is rejected with an IBAN-regex message, switch to IBAN format.",
+      "verified": "2026-04", "scope": "org-dependent"
+    },
+    {
+      "country": "EU", "fiat": "EUR", "method": "Sepa",
+      "dtoVariant": "SepaDetailsCreateDto",
+      "requiredDetails": ["bankName", "accountHolderName", "bankAccountNumber", "swiftOrBicNumber", "accountOwnerType", "address"],
+      "conditionallyRequired": {"businessName": "when accountOwnerType is Business"},
+      "forbiddenDetails": ["iban"],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "bankAccountNumber must hold the FULL IBAN. A bare account number passes PI creation but fails async. SEPA may require org-level enablement — see providers/bridge.md.",
+      "verified": "2026-04", "scope": "provider-dependent"
+    },
+    {
+      "country": "BR", "fiat": "BRL", "method": "PIX",
+      "dtoVariant": "IdentifierDetailsCreateDto",
+      "requiredDetails": ["identifierType", "identifierValue"],
+      "forbiddenDetails": ["bankName", "accountHolderName", "bankAccountNumber", "address"],
+      "invoiceRequiredOnWithdrawal": "only at or above 50000 BRL",
+      "perTransactionCap": {"value": 100000, "currency": "BRL"},
+      "notes": "identifierType: Email | CPF | CNPJ | PhoneNumber | EVP. address is deprecated for PIX.",
+      "verified": "2026-03", "scope": "provider-dependent"
+    },
+    {
+      "country": "AR", "fiat": "ARS", "method": "COELSA",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankSlug", "bankName", "accountHolderName", "bankAccountNumber", "bankAccountNumberType", "address"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "bankAccountNumber is the exact 22-digit CBU/CVU. bankAccountNumberType: CBU | CVU | ALIAS. Some PFIs validate the identity's CUIT (mod-11) and require address.country == AR — see providers/koywe.md. Discovery may return institutionIdentifier: bankName on some orgs.",
+      "verified": "2026-03", "scope": "org-dependent"
+    },
+    {
+      "country": "CO", "fiat": "COP", "method": "PSE",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankName", "accountHolderName", "bankAccountNumber", "bankAccountType", "address", "bankSlug or bankCode per discovery"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "Use whichever institutionIdentifier discovery returns. Some PFIs require address.country == CO.",
+      "verified": "2026-02", "scope": "org-dependent"
+    },
+    {
+      "country": "CO", "fiat": "COP", "method": "Bre-B",
+      "dtoVariant": "BrebKeyDetailsCreateDto",
+      "requiredDetails": ["brebKey"],
+      "forbiddenDetails": ["bankName", "accountHolderName", "bankAccountNumber"],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "Key-only corridor.",
+      "verified": "2026-04", "scope": "provider-dependent"
+    },
+    {
+      "country": "MX", "fiat": "MXN", "method": "SPEI",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankName", "accountHolderName", "bankAccountNumber", "address"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": {"value": 100000, "currency": "MXN"},
+      "notes": "The 18-digit CLABE goes in bankAccountNumber. Asset support varies by active provider — validate via organizations/network (see cookbook/discovery.md).",
+      "verified": "2026-06", "scope": "provider-dependent"
+    },
+    {
+      "country": "NG", "fiat": "NGN", "method": "BankTransfer",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankSlug", "bankName", "accountHolderName", "bankAccountNumber", "address"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": {"value": 3164, "currency": "USD", "note": "also expressed as 30M NGN"},
+      "notes": "Slugs are PFI-specific — re-discover after any routing change. Method is BankTransfer, not NIP.",
+      "verified": "2026-06", "scope": "provider-dependent"
+    },
+    {
+      "country": "AE", "fiat": "AED", "method": "NPSS",
+      "dtoVariant": "IbanBankDetailsIbanCreateDto",
+      "requiredDetails": ["iban", "address"],
+      "forbiddenDetails": ["bankName", "accountHolderName", "bankAccountNumber"],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "One of the few corridors where the iban field name is correct.",
+      "verified": "2026-03", "scope": "provider-dependent"
+    },
+    {
+      "country": "EG", "fiat": "EGP", "method": "BankTransfer",
+      "dtoVariant": "IbanBankDetailsIbanCreateDto",
+      "requiredDetails": ["bankSlug", "iban", "address"],
+      "forbiddenDetails": ["bankName", "accountHolderName", "bankAccountNumber"],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "IBAN-only shape like AE/NPSS, plus bankSlug.",
+      "verified": "2026-06", "scope": "provider-dependent"
+    },
+    {
+      "country": "TR", "fiat": "TRY", "method": "EFT",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankSlug", "bankName", "accountHolderName", "bankAccountNumber", "address"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": {"value": 100000, "currency": "TRY", "note": "~2,900 USDC at 2026-06 rates — amount is in source asset"},
+      "notes": "bankAccountNumber holds the Turkish IBAN.",
+      "verified": "2026-06", "scope": "provider-dependent"
+    },
+    {
+      "country": "IN", "fiat": "INR", "method": "IMPS_FIRC",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankAccountNumber", "localRoutingCode", "bankName", "accountHolderName", "address"],
+      "forbiddenDetails": ["localRoutingNumber", "bankCode (silently ignored)"],
+      "invoiceRequiredOnWithdrawal": true,
+      "perTransactionCap": null,
+      "notes": "localRoutingCode holds the IFSC; accepted on creation but not echoed in GET. Invoice on the withdrawal call is an Indian regulatory requirement (FIRC).",
+      "verified": "2026-03", "scope": "provider-dependent"
+    },
+    {
+      "country": "PH", "fiat": "PHP", "method": "BankTransfer",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankSlug", "bankName", "accountHolderName", "bankAccountNumber", "address"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "For e-wallets (GCash), bankAccountNumber is the phone number; discover the wallet's slug.",
+      "verified": "2026-03", "scope": "provider-dependent"
+    },
+    {
+      "country": "ZA", "fiat": "ZAR", "method": "EFT",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankSlug", "bankName", "accountHolderName", "bankAccountNumber", "address"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "Method is EFT, not BankTransfer.",
+      "verified": "2026-03", "scope": "provider-dependent"
+    },
+    {
+      "country": "PK", "fiat": "PKR", "method": "IBFT",
+      "dtoVariant": "IbanBankDetailsIbanCreateDto",
+      "requiredDetails": ["bankSlug", "iban", "address"],
+      "forbiddenDetails": ["bankName", "accountHolderName", "bankAccountNumber"],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "IBAN format PK36ABPL...",
+      "verified": "2026-04", "scope": "provider-dependent"
+    },
+    {
+      "country": "CA", "fiat": "CAD", "method": "EFT",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankSlug", "bankName", "accountHolderName", "bankAccountNumber", "localRoutingCode", "address"],
+      "forbiddenDetails": ["transitNumber"],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "localRoutingCode holds the transit number (XXX-XXXXX or XXXXX-XXX).",
+      "verified": "2026-04", "scope": "provider-dependent"
+    },
+    {
+      "country": "AU", "fiat": "AUD", "method": "BECS",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["accountHolderName", "bankAccountNumber", "localRoutingCode", "address"],
+      "forbiddenDetails": ["bsbNumber"],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "localRoutingCode holds the 6-digit BSB.",
+      "verified": "2026-04", "scope": "provider-dependent"
+    },
+    {
+      "country": "JP", "fiat": "JPY", "method": "BankTransfer",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankSlug", "bankName", "accountHolderName", "bankAccountNumber", "address", "routing identifier per discovery (XXXX-XXX)"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "4-digit bank + 3-digit branch. Trust institutionIdentifier from discovery for the field name.",
+      "verified": "2026-04", "scope": "org-dependent"
+    },
+    {
+      "country": "TH|ID|SG|KE|GH|BD", "fiat": "local", "method": "BankTransfer",
+      "dtoVariant": "BankDetailsCreateDto",
+      "requiredDetails": ["bankSlug", "bankName", "accountHolderName", "bankAccountNumber", "address"],
+      "forbiddenDetails": [],
+      "invoiceRequiredOnWithdrawal": "GH: true",
+      "perTransactionCap": null,
+      "notes": "Standard slug-based corridors.",
+      "verified": "2026-04", "scope": "provider-dependent"
+    },
+    {
+      "country": "KE|GH|NG (MobileMoney)", "fiat": "local", "method": "MobileMoney",
+      "dtoVariant": "MobileMoneyDetailsCreateDto",
+      "requiredDetails": ["phone", "accountHolderName"],
+      "optionalDetails": ["networkSlug"],
+      "forbiddenDetails": ["networkProvider (deprecated)"],
+      "invoiceRequiredOnWithdrawal": false,
+      "perTransactionCap": null,
+      "notes": "Use networkSlug discovered at runtime.",
+      "verified": "2026-04", "scope": "provider-dependent"
+    }
+  ],
+  "invoiceRequiredCountries": {
+    "list": ["IN", "GH", "CN"],
+    "conditional": {"BR": "at or above 50000 BRL"},
+    "behavior": "Omitting documents does not 422 — the withdrawal submits, then fails async with 'please upload an invoice…'. Pass documents: [{type: 'Invoice', content: 'data:image/jpeg;base64,...'}] on POST /withdrawals. JPEG/PNG/PDF, min 200x200, max 5MB."
+  }
+}

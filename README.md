@@ -80,7 +80,9 @@ The toolbox auto-loads context for the six core Borderless flows. Each has a ded
 | **Virtual accounts** | Named bank accounts created in the identity's name with stable deposit instructions for recurring first-party funding — the end user moves fiat from their own external accounts on a recurring basis without a per-deposit API call. First-party only; not for third-party collection. | `borderless-virtual-account-flow` |
 | **Webhooks** | Signed event delivery: signature verification (TS/Python/Go), idempotency on event `id`, auto-disable handling, the `WebhookEventEntity` delivery log | `borderless-webhook-verifier` |
 
-Operational reference content lives under `cookbook/`: the **error catalog** (every common sync 4xx and async PFI failure mapped to cause and fix, plus the full `TransactionStatus` and `ComplianceStatus` enums), the **sandbox-to-production checklist**, **reconciliation** (including the `/reconciliation/items` and `/orphaned-transactions` endpoints), webhook replay, amount-handling rules, and local compliance testing.
+Operational reference content lives under `cookbook/`: **discovery** (the endpoint ladder for validating what your org can actually do — start here), the **error catalog** (every common sync 4xx and async PFI failure mapped to cause and fix, plus the full `TransactionStatus` and `ComplianceStatus` enums), the **sandbox-to-production checklist**, **reconciliation** (including the `/reconciliation/items` and `/orphaned-transactions` endpoints), webhook replay, amount-handling rules, and local compliance testing.
+
+Provider-specific integration notes live under `providers/` — one page per PFI with its compliance style, identity requirements, payment-instruction shapes, and message signatures, keyed by the `pfiName` you see on transactions. And `data/corridors.json` is a machine-readable snapshot of per-corridor payment-instruction requirements for programmatic use.
 
 ## Typical customer workflow
 
@@ -97,7 +99,9 @@ Operational reference content lives under `cookbook/`: the **error catalog** (ev
 - `.claude/commands/` — slash commands: `/borderless-onboard`, `/borderless-coverage`, `/borderless-scaffold`, `/borderless-lint`, `/borderless-test-webhook`, `/borderless-install-into`.
 - `.claude/agents/borderless-integration-reviewer.md` — a reviewer subagent you invoke for PR audits.
 - `examples/` — five runnable TypeScript references that chain: `compliance-personal/` → `account-setup/` → `deposit-us-ach-to-usdc/` → `withdrawal-usdc-to-us-ach/`, plus a standalone `webhooks/` Express handler. Each prints the env-var values the next step needs.
-- `cookbook/` — short guides for post-onboarding situations: amount handling, the error catalog (sync + async PFI failures, full status enums), reconciliation (including the `/reconciliation/items` and `/orphaned-transactions` endpoints), sandbox-to-production checklist, compliance testing, webhook replay.
+- `cookbook/` — short guides for post-onboarding situations: discovery (validating org capability before you build), amount handling, the error catalog (sync + async PFI failures, full status enums), reconciliation (including the `/reconciliation/items` and `/orphaned-transactions` endpoints), sandbox-to-production checklist, compliance testing, webhook replay.
+- `providers/` — per-PFI integration notes (compliance style, identity fields, PI shapes, message signatures). For debugging by `pfiName` — never for routing logic.
+- `data/corridors.json` — machine-readable per-corridor payment-instruction requirements (mirrors the withdrawal skill's table; live discovery is authoritative).
 - `prompts/` — copy-paste prompt templates for larger tasks (build an integration in your stack, audit your integration, migrate from another vendor).
 - `CLAUDE.md` — the workspace context Claude reads on every session. Covers base URLs, auth, the Identity → Compliance → Account → Transaction mental model, and hard rules.
 - `CUSTOMIZE.md` — what to edit, what to leave alone, what to delete.

@@ -78,6 +78,7 @@ Iterate `data` and find the entry whose `id` matches the one returned at creatio
 - Compliance was not approved at the time of creation. (Compliance must be `Approved` / `PreApproved` first.)
 - Identity address is in a region the PFI does not support for virtual accounts (e.g., certain US states).
 - Identity is missing fields required for the dedicated-account product (often more strict than for one-off deposits).
+- **The virtual-account product isn't enabled for your identity/org yet.** Some PFIs gate VAs separately from transactional compliance — an identity fully `Approved` for deposits and withdrawals can still see "Customer has not been approved for virtual bank accounts". This is an enablement step, not a compliance failure — coordinate through support@borderless.xyz.
 
 ## 3. Use the deposit instructions
 
