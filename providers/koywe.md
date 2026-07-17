@@ -9,16 +9,19 @@ Koywe runs some of the most thorough data validation in the network — real loc
 ## Compliance behavior
 
 - Compliance is initiated per slug (`POST /identities/{id}/compliance-checks/{slug}` with `idempotency-key`); approves in sandbox once identity data passes validation.
-- **Personal KYC is not country-locked.** A complete personal identity approves regardless of where the person is registered — a US-registered personal identity approves in ~15 seconds once `activity` is set (Koywe requires a non-null `activity`; free text, 1–255 chars). The country constraint below applies to *transacting*, not to identity approval.
-- **Business KYB can carry residual sandbox state.** On some orgs, initiating the business check returns `Document already exists for this client` because Koywe's sandbox already holds a customer/document record for that business from a prior run. There is no client-side document delete for this — coordinate a provider-side reset with support@borderless.xyz. *(Org-dependent.)*
+- **Personal KYC is not country-locked.** A complete personal identity approves regardless of where the person is registered — approval lands in ~15 seconds once `activity` is set (Koywe requires a non-null `activity`; free text, 1–255 chars) and a document from `oneOf [DriverLicense, NationalId, Passport]` is on file. The country constraint below applies to *transacting*, not to identity approval.
+- **Personal `sourceOfFunds` is PascalCase** (`"Salary"`), while business identities use snake_case (`"business_revenue"`) — the 422 names the enum if you mix them up.
+- **Identity documents are deduplicated by ID number across Koywe's whole sandbox**, not just your org. A collision surfaces at compliance *initiation* (`identity.Account already exists with document.idNumber …`), not at document upload. Fix client-side: pick a fresh, unused ID number, re-`PUT` the document, and re-initiate — approval then lands normally.
 
 ## Identity requirements
 
 - **Both directions hard-require `identity.address.country` == destination country** (confirmed 2026-07 on withdrawals and deposits). A US-registered identity cannot transact on an AR/CL/CO/MX/PE rail — Koywe's underlying rule is "account from USA can't operate in [country]". Plan **one identity per Koywe-served destination country** — the identity's registered address country has to equal the corridor country. With a destination-country identity, both deposit and withdrawal complete cleanly (verified end-to-end for MX).
-- **Tax IDs are validated against real local formats:**
-  - Argentina: CUIT with a valid **mod-11 check digit** (11 digits; prefixes 20/23/24/27 individuals, 30/33/34 businesses). Fabricated digits won't pass — compute a valid check digit for test data. (US tax IDs on a US identity pass without the CUIT checksum check — that validation only bites LATAM tax IDs.)
-  - Colombia: NIT format.
-  - **Mexico: the identity document's `idNumber` is validated as a CURP** for individuals — a passport number is rejected (`identity.document.idNumber: format is invalid: CURP-…`). Use an 18-character CURP with a valid check digit. Koywe also enforces CURP **uniqueness across its sandbox** — a previously used CURP returns `identity.Account already exists with document.idNumber … and type CURP in MEX`; generate a fresh one per test identity.
+- **Tax IDs and document ID numbers are validated against real local formats**, verified per country in 2026-07:
+  - **Argentina:** CUIT/CUIL with a valid **mod-11 check digit** (11 digits; prefixes 20/23/24/27 individuals, 30/33/34 businesses). Fabricated digits won't pass — compute a valid check digit for test data. The `NationalId` document's `idNumber` is the plain 8-digit DNI. (US tax IDs on a US identity pass without the checksum check — that validation only bites LATAM tax IDs.)
+  - **Chile:** RUT with its mod-11 check digit, and the `NationalId` `idNumber` carries the same RUT **with the dash and check digit included** (`15987654-3`).
+  - **Colombia:** businesses use NIT format; individuals use the plain Cédula de Ciudadanía (no checksum). Colombian cédulas have no expiry — `expiryDate` can be omitted on the document.
+  - **Peru:** plain 8-digit DNI, no checksum — but subject to the sandbox-wide uniqueness rule above; use a fresh DNI per test identity.
+  - **Mexico: the identity document's `idNumber` is validated as a CURP** for individuals — a passport number is rejected (`identity.document.idNumber: format is invalid: CURP-…`). Use an 18-character CURP with a valid check digit, unique per test identity (same dedup rule).
 - Document `issuingCountry` should match the identity's `address.country`.
 
 ## Payment instruction notes
@@ -30,19 +33,29 @@ Koywe runs some of the most thorough data validation in the network — real loc
 - **Withdrawal bodies require `paymentPurpose` and reject `paymentMethod`** (`paymentMethod should not exist` — the method comes from the payment instruction; verified live 2026-07). `paymentPurpose` comes from a closed enum (`salary payment, personal remittance, rent payment, property purchase, owned account abroad, advertising expenses, advisory fees, business insurance, construction, delivery fees, education, exports, donation, hotel, loan payment, maintenance expenses, medical expense, office expenses, royalty fees, service charge, shares investment, tax payment, transportation fees, travel, utility bills, other`) — `other` is a safe default.
 - **Deposit bodies require `paymentMethod` but reject `paymentPurpose`** (`paymentPurpose should not exist`). The field is withdrawal-only.
 
-## Limits
+## Limits and the flat-fee floor
 
 - Deposit `fromAmount` is denominated in the **fiat** currency; withdrawal `fromAmount` is in **source-asset** (e.g. USDC) units. Convert before checking a minimum.
 - Per-corridor deposit minimums observed: AR **5,000 ARS**, CL **2,000 CLP**, CO **4,050 COP**, MX **50 MXN**-equivalent. A below-minimum quote returns e.g. `Amount for ARS in AR is below minimum limit: 5000.00 ARS`.
+- **The quoted `minAmount` is not the real practical floor — Koywe charges a flat per-transaction fee on some deposit rails** (observed: ~5,112 COP on CO/PSE, ~8.46 PEN on PE/CCE), and a deposit whose amount doesn't comfortably clear the flat fee nets out to zero (`"Amount Out can't be zero or less"`). **Always call `/deposits/quotes/pfis` first and check `available: true`** — if the quote itself errors with that message, raise the amount well above the flat fee rather than trusting `limits.transaction.minAmount`.
 
 ## Sandbox notes
 
-- **A deposit from a wrong-country identity can currently surface as `Provider credentials are invalid`** at the settlement step (a few seconds after `Submitted` — the transaction is created, then flips to `Failed`). The underlying Koywe response is the country rule above ("account from USA can't operate in [country]"), not a credential problem; the error mapping is being improved. If you see this on a deposit, check the identity's `address.country` against the corridor first.
-- **A deposit that flips to `Failed` shortly after `Submitted` can be a transient async bank-provisioning step, not a terminal result.** Re-poll before treating it as final — a genuine provisioning flip resolves to `Completed`. A persistent, unchanging `Provider credentials are invalid` across several re-polls is the credential gap above, which won't clear client-side.
+- **A deposit that flips to `Failed` shortly after `Submitted` can be a transient async bank-provisioning step, not a terminal result.** Re-poll before treating it as final — a genuine provisioning flip resolves to `Completed`.
+- If a deposit fails at settlement a few seconds after `Submitted`, **check the identity's `address.country` against the corridor first** — the destination-country identity rule above is the most common cause and fixes it outright.
+- One transaction JSON nuance: the `instructions` string can contain a literal newline, which strict JSON parsers reject — parse with `strict=False` (Python) or equivalent.
 
 ## Verified end-to-end (2026-07)
 
-A full MX **deposit and withdrawal** pair completed on a fresh sandbox org following exactly the rules above: MX-registered personal identity (`activity` set, `sourceOfFunds` in the personal PascalCase enum e.g. `Salary`) → `NationalId` document with a unique, check-digit-valid CURP → compliance `Approved` in ~15s → SPEI payment instruction with a checksum-valid CLABE → withdrawal `Completed` in ~90s, pinned `pfiName` holding as Koywe throughout.
+The destination-country identity recipe is verified across four corridors — each with a local personal identity, country-correct document, and (where applicable) checksum-valid account number:
+
+- **MX/SPEI:** deposit + withdrawal `Completed` (~90s). MX identity with a unique, check-digit-valid CURP; SPEI PI with a checksum-valid CLABE.
+- **CL/SPAV:** deposit + withdrawal `Completed` first try (~65s). CL identity with RUT (dash + check digit on the document).
+- **CO/PSE:** deposit + withdrawal `Completed` (~65s). CO identity with plain CC; deposit sized above the flat-fee floor.
+- **PE/CCE:** deposit + withdrawal `Completed` (~65s). PE identity with a fresh DNI; quote-checked the amount before submitting.
+- **AR/COELSA:** deposit `Completed` (~65s) with an AR identity (CUIL + DNI document). The withdrawal side additionally runs Koywe's bank-account **ownership verification** (see Payment instruction notes) — request PFI-issued test credentials via support@borderless.xyz for that leg.
+
+In every case the pinned `pfiName` held as Koywe end-to-end.
 
 ## Message signatures
 
@@ -57,5 +70,7 @@ A full MX **deposit and withdrawal** pair completed on a fresh sandbox org follo
 | `accountType is required and must be one of: checking,savings,interbanking` | Add `bankAccountType` to PI details |
 | `paymentMethod must be one of the following values: …` (deposit) | Add `paymentMethod` to the deposit body |
 | `paymentPurpose should not exist` | Drop `paymentPurpose` from a deposit body (withdrawal-only field) |
-| `Failed to validate if bank account … belongs to …` | Ownership verification vs test data → request test credentials via support |
-| `Provider credentials are invalid` (deposit, at settlement) | Usually the identity-country rule surfacing under a generic message (mapping fix in progress) → use an identity registered in the corridor country |
+| `identity.Account already exists with document.idNumber …` | Document ID number already registered in Koywe's sandbox → fresh ID number, re-`PUT` the document, re-initiate |
+| `Amount Out can't be zero or less` (deposit quote or settlement) | Amount doesn't clear the rail's flat fee → raise it well above the fee and re-quote until `available: true` |
+| `Failed to validate if bank account … belongs to …` | Ownership verification, not a format error — don't retry with a corrected checksum; use an account genuinely owned by the identity (production) or PFI-issued test credentials via support (sandbox) |
+| `Provider credentials are invalid` (deposit, at settlement) | Check the identity's `address.country` against the corridor first — the destination-country identity rule is the most common cause |

@@ -32,7 +32,7 @@ Corridors observed: **MX/SPEI**. Coverage spans LATAM + US assets (ARS, BOB, BRL
 
 ## Sandbox notes
 
-- In sandbox, Alfred decisions individual KYC on the submitted identity data. Synthetic test personas can reach a **terminal `Rejected` (`OtherUnspecified`)** with `canResync: false` — this is expected behavior for fabricated identities, not an integration defect. Re-initiating spawns a fresh submission id but a synthetic persona re-decisions the same way. For verified sandbox test personas that clear individual and business flows end to end, coordinate with support@borderless.xyz. *(sandbox-only)*
+- Alfred runs real KYC/KYB decisioning on the submitted identity data even in sandbox — plan on realistic test personas. For sandbox test personas that clear the individual and business flows end to end, coordinate with support@borderless.xyz. *(sandbox-only)*
 
 ## Message signatures
 
@@ -40,5 +40,3 @@ Corridors observed: **MX/SPEI**. Coverage spans LATAM + US assets (ARS, BOB, BRL
 |---|---|
 | `identity: Compliance check failed` (async, MXN) | The type-driven Alfred check hasn't reached `Approved` → initiate by type; supply citizenship + business docs |
 | `citizenship should not exist` | Field sent on the business identity → set it on the personal identity |
-| KYB `Incomplete`, reason `Beneficial ownership National ID Back` | Owner National ID missing its back face → upload the UBO `NationalId` with both `imageFront` and `imageBack` |
-| KYC terminal `Rejected` / `OtherUnspecified` (sandbox) | Expected for synthetic personas → request a verified test persona via support@borderless.xyz |

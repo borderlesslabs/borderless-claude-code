@@ -11,7 +11,7 @@ Corridors verified reaching `Completed` (2026-07):
 - **MEA:** AE/AED (NPSS), EG/EGP, GH/GHS, IL/ILS (ZAHAV), JO/JOD, KE/KES, NG/NGN (NIP), QA/QAR, SA/SAR (MADA), TZ/TZS, ZA/ZAR (EFT).
 - **APAC:** BD/BDT, CN/CNY, HK/HKD (FPS), ID/IDR, IN/INR (IMPS_FIRC), JP/JPY, KR/KRW, LK/LKR, PH/PHP (GCash), PK/PKR (IBFT), SG/SGD, MY/MYR, TH/THB, VN/VND.
 
-Corridors observed *not yet* completing end-to-end on the test org are called out under "Corridors pending coordination" and "Sandbox notes" — each is org- or configuration-dependent, not a shape you can fix in the payload.
+Corridor availability is org-dependent — confirm any corridor not in the verified list against your own org's discovery before building.
 
 ## Compliance behavior
 
@@ -84,7 +84,6 @@ Standard bank shape **plus** a routing-style field the PI-creation validator doe
 | **CA/EFT (CAD)** | `localRoutingCode` | 5-digit transit number |
 | **IN/IMPS_FIRC (INR)** | `localRoutingCode` | IFSC code (use `localRoutingCode`, **not** `localRoutingNumber` or `bankCode`); `allInstitutionsSupported: true`, no slug list |
 | **CN/BankTransfer (CNY)** | `localRoutingCode` | 12-char CNAPS code; `institutionIdentifier` is `localRoutingCode` (empty slug list); `address.postalCode` is a real 6-digit code |
-| **AU/BECS (AUD)** | `localRoutingCode` | 6-digit BSB *(see Corridors pending coordination)* |
 | **JP/BankTransfer (JPY)** | `bankCode` | 4-digit Japanese bank code (e.g. `0001`); distinct from `bankSlug` — both are needed |
 | **JM/BankTransfer (JMD)** | `bankCode` | format `NNNNN NNN` (5 digits, space, 3 digits — the PFI error states the expected format) |
 
@@ -110,17 +109,7 @@ Per-transaction maxima vary widely by corridor — always size from the live quo
 
 - **Virtual accounts are enabled separately from transactional compliance.** A VA request can return `Customer has not been approved for virtual bank accounts` even when the identity is `Approved` for deposits and withdrawals. Coordinate VA enablement through support@borderless.xyz.
 - **New sandbox orgs need the Walapay integration configured before discovery works** (`Walapay API Key is not configured for this organization`) — support handles this during provisioning.
-- **RSD/BankTransfer (RS)** is listed with `defaultPfi: Walapay` in provider config but the currency pair may not be enabled for a given team — discovery returns `This currency pair is not supported for your team. Please contact support.` Request enablement through support@borderless.xyz. *(org-dependent)*
-
-## Corridors pending coordination
-
-These quote and (mostly) accept a payment instruction but do not yet complete end-to-end on the test org. Each is a configuration or org-data item — not a payload shape you can fix — so coordinate with support@borderless.xyz rather than iterating on the request.
-
-- **Nordic / CEE domestic BankTransfer (CZK, DKK, NOK, PLN, RON, SEK):** the PI is created and passes Borderless-side validation, but the withdrawal reports `Failed to create account: Missing required fields: bank.iban` (SEK also names `bank.bankCode`) at the PFI, while the PI-creation validator rejects a top-level `iban` field for the same corridors. GBP (same method) and CHF/SIC complete normally, so this is specific to these currencies' field mapping. *(org/sandbox-dependent)*
-- **PL IBAN length:** `bankAccountNumber` caps at 27 characters, which a full 28-char Polish IBAN exceeds (`bankAccountNumber must be shorter than or equal to 27 characters`). A domestic-format account number fits the cap but still hits the mapping item above. Flag to support if you need the full-IBAN format.
-- **USD in a non-USD-home country (observed for CR/SINPE and LK/BankTransfer):** `/withdrawals/quotes/pfis` confirms the corridor, but PI creation rejects `currency: "USD"` for `country: "CR"`/`"LK"` (`USD does not match the country ...`). Other USD-in-foreign-country combos on the same check accepted USD (SV, and SG via Swift), so the behavior is inconsistent — coordinate with support to enable the dollarized-market combos. *(org-dependent)*
-- **SV (El Salvador) address:** `address.postalCode` was rejected for every SV format tried (`has invalid value for the given country`), blocking USD/ACH to SV at PI creation. Coordinate with support rather than guessing postal formats. *(org-dependent)*
-- **AU/BECS (AUD):** the PI shape (`localRoutingCode` = 6-digit BSB + standard bank fields, AU-format destination postal code) is accepted, but account creation validates the **sender identity's own** `address.postalCode` against an Australian 4-digit format — a non-AU-domiciled business identity fails here (`identity.address.postalCode ... Example: 2000`). The failure path is `identity.address.postalCode`, not a `paymentInstruction.*` path. Confirm with support whether an AU-domiciled sender identity is required for this rail. *(org/identity-dependent)*
+- **Currency-pair enablement is per team/org.** A corridor listed in your org's provider config can still return `This currency pair is not supported for your team. Please contact support.` at discovery — request enablement through support@borderless.xyz before building against it. *(org-dependent)*
 
 ## Message signatures
 
@@ -129,20 +118,16 @@ These quote and (mostly) accept a payment instruction but do not yet complete en
 | `compliance: Error creating customer.` / `Validation error from PFI` at initiation | Image below quality threshold, or an owner identity not yet onboarded, or (US person) DriverLicense front+back missing → upload ≥1200×900 images incl. DriverLicense both sides, drive owner compliance |
 | `<field> should not exist` on PI creation (e.g. `bankName`/`accountHolderName`/`bankAccountNumber`, or `iban`) | Wrong shape family for this corridor → switch to the family it uses (iban-only, iban+bankSlug, etc.) |
 | `bank.iban must match IBAN regex` | Corridor expects IBAN format in `bankAccountNumber` (e.g. GB) |
-| `Failed to create account: Missing required fields: bank.iban` (async `Failed`) | Nordic/CEE domestic BankTransfer mapping → support@borderless.xyz *(org/sandbox-dependent)* |
 | `Failed to create account: Missing required fields: bank.branchCode` | BR/TED needs `localRoutingCode` (branch/agência code) |
 | `Failed to create account: Missing required fields: bank.bankCode` | JP needs `bankCode` (4-digit); JM needs `bankCode` |
 | `... does not match expected format. Example: 00000 999` | JM `bankCode` format `NNNNN NNN` |
 | `Account number must be 20 digits for PE bank accounts.` | Pad PEN `bankAccountNumber` to exactly 20 digits |
 | `bankAccountType should not be null or undefined` | US/Wire (and ACH) need `bankAccountType` = `Checking`/`Savings` |
-| `bankAccountNumber must be shorter than or equal to 27 characters` | PL full IBAN (28 chars) over cap → support; domestic account number fits meanwhile |
 | `Amount for TRY in TR is above maximum limit: 100000.00 TRY` | Over the TRY cap → size `fromAmount` from live `exchangeRate` |
 | `documents ... dimensions must be at least 200x200px` | INR invoice image too small → use ≥200×200 |
-| `USD does not match the country: <CC>. Possible currencies ...` | USD-in-foreign-country PI validation → support@borderless.xyz *(org-dependent)* |
-| `address.postalCode ... has invalid value for the given country` | Postal-code format not accepted for this country (observed SV) → support |
 | `Customer has not been approved for virtual bank accounts` | VA enablement pending → support@borderless.xyz |
 | `Walapay API Key is not configured for this organization` | Org provisioning pending → support@borderless.xyz |
-| `This currency pair is not supported for your team. Please contact support.` | Currency-pair enablement (observed RSD) → support@borderless.xyz |
+| `This currency pair is not supported for your team. Please contact support.` | Currency-pair enablement for your org → support@borderless.xyz |
 | `Failed to retrieve or create Walapay bank account` | Often transient → retry once before deeper debugging |
 
 ## Sandbox notes

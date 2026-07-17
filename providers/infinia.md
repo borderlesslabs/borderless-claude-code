@@ -2,7 +2,7 @@
 
 > Last verified: 2026-07 · Scope: provider-dependent unless noted. Routing is org-dependent — confirm with `GET /organizations/network?status=active`.
 
-Corridors observed: **BR/PIX**, **MX/SPEI**, **AR/COELSA**, **CL/SPAV**, **CO/PSE**, **PE/CCE**, **PY/SPI**, and **BO/ACH** (withdrawal). Broad LATAM coverage under a single PreApproved compliance profile.
+Corridors observed: **BR/PIX**, **MX/SPEI**, **AR/COELSA**, **CL/SPAV**, **CO/PSE**, **PE/CCE**, **PY/SPI**. Broad LATAM coverage under a single PreApproved compliance profile.
 
 ## Compliance behavior
 
@@ -34,12 +34,9 @@ Request-body notes (enforced at the Borderless API layer, but every integrator h
 | `paymentMethod should not exist` (withdrawal) | Withdrawals take the method from the PI — drop the field |
 | `paymentPurpose must be one of the following values: …` | Use a value from the closed enum; `other` is a safe default |
 | `paymentPurpose should not exist` | Drop `paymentPurpose` from a deposit body (withdrawal-only field) |
-| `ACH does not match the country: BO` at BO discovery | Discovery/quote validator out of sync with `/options` for BO/ACH on some orgs → support@borderless.xyz *(org-dependent)* |
-| `An error occurred processing the internal transfer` (path `transfer`, at settlement) | Settlement-stage issue observed org-wide on some sandbox orgs; request shape is fine → support@borderless.xyz *(org-dependent / sandbox)* |
 
 ## Sandbox notes
 
-- **When healthy, Infinia is fast** — withdrawals have been observed reaching `Completed` in ~15 seconds, which makes it a useful control corridor when debugging slower flows.
-- **Settlement-stage failures can affect every corridor on a given sandbox org.** On the org tested in 2026-07, transactions were created correctly (`201` → `Submitted` → `Pending`, with deposit `instructions` populating a hosted-redirect payload ~10s in), then flipped to `Failed` at the simulated internal-transfer step with `failureReason.details: [{"path":"transfer","pfiErrorMessage":"An error occurred processing the internal transfer"}]` — identically across deposits and withdrawals and multiple currencies. Because it reached instruction issuance correctly, the request shapes above are verified; the failure is at settlement and is not client-fixable. If you see this org-wide, escalate to support@borderless.xyz rather than debugging your payload. *(Org-dependent / sandbox.)*
-- Deposit `instructions` populating from `null` is normal issuance, not a compliance signal — on a healthy org the transfer completes after it; on the affected org above the failure occurs *after* issuance.
-- **BO/ACH withdrawal has a discovery-level validation mismatch on some orgs.** `GET /withdrawals/options?fiat=BOB&country=BO` lists `ACH` as valid and the `Infinia_base` compliance coverage lists `{BOB, ACH, BO}`, but `GET /withdrawals/institutions` and `/withdrawals/quotes/pfis` reject the same tuple with `ACH does not match the country: BO`. There's no alternate method for this pairing to work around it — coordinate with support@borderless.xyz. *(Org-dependent.)*
+- **Fast:** withdrawals have been observed reaching `Completed` in ~15 seconds, which makes Infinia a useful control corridor when debugging slower flows.
+- Deposit `instructions` populate from `null` a few seconds after submission (a hosted-redirect payload ~10s in) — that transition is normal issuance, not a compliance signal.
+- If a failure affects every corridor identically on your org (same `failureReason` across currencies and directions), escalate to support@borderless.xyz rather than debugging your payload — corridor-wide patterns are configuration-level and resolve on the network side.

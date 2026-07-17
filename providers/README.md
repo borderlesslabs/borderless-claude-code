@@ -29,16 +29,13 @@ Corridor routing evolves as the network grows — corridors can move between PFI
 | [Bridge](bridge.md) | US/USD (ACH, Wire), EU/SEPA, USD virtual accounts | ToS + initiation |
 | [Walapay](walapay.md) | 50+ corridors across Americas, Europe, MEA, APAC | ToS + initiation, thorough document validation |
 | [Koywe](koywe.md) | AR, CL, CO, MX, PE | Initiation, rigorous local-format validation; identity per destination country |
-| [Alfred](alfred.md) | MX/SPEI | Type-driven check (null slug); KYB needs UBO National ID front + back |
+| [Alfred](alfred.md) | MX/SPEI | Type-driven check (initiate by type, not slug) |
 | [Infinia](infinia.md) | BR, MX, AR, CL, CO, PE, PY, BO | PreApproved — instant |
 | [Yellow Card](yellowcard.md) | NGN, ZAR, Africa | PreApproved for foreign businesses; local KYC for residents |
 | [HoneyCoin](honeycoin.md) | NGN + African bank & mobile money (TZ, KE, UG, CM, GH, RW, SN, MW) | PreApproved |
 | [Bitso](bitso.md) | AR, CO, MX | PreApproved; NationalId document |
-| [BlindPay](blindpay.md) | US, BR, MX, CO, AR (USDB on Base) | ToS + initiation, per-identity |
 | [Cobre](cobre.md) | MX, CO (incl. Bre-B) | No compliance profile observed — transactable on provisioning |
 | [Capa](capa.md) | MX | Initiation; individual KYC scoped to Mexican residents |
 | [Finity](finity.md) | CO/PSE | PreApproved; NationalId or ResidencePermit |
-| [Kotanipay](kotanipay.md) | ZA + African mobile money | PreApproved |
-| [TraceFinance](tracefinance.md) | BR/PIX | KYB-only (business identities) |
 
 A provider only gets a page once we have verified first-hand integration observations to share. Absence of a page means "no notes yet", nothing more.

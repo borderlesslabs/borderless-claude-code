@@ -50,14 +50,14 @@ See the country-by-country `details` table in the `borderless-withdrawal-flow` s
 
 ### Payment-instruction country & address validation
 
-PI creation enforces a country/currency/method compatibility table and per-country address formats. This table can be **stricter** than `/withdrawals/options` and the compliance coverage map — a route can quote as available yet fail PI creation. Trust the stricter signal and confirm the route with support@borderless.xyz.
+PI creation enforces a country/currency/method compatibility table and per-country address formats. These checks run at creation time and can be stricter than a quote — clear them with correctly formatted local data.
 
 | Status / Message | Cause | Fix |
 |---|---|---|
-| `422 {currency} does not match the country: {CC}. Possible currencies for the country: {CCY}` | The PI `currency` isn't the country's default | Use the country's native currency. Dollarized routes (a country whose native currency is USD) accept USD; others reject it even when a quote for the pair exists. If no `(country, currency)` pairing satisfies creation for a route that quotes, flag it to support@borderless.xyz. |
-| `422 {method} does not match the country: {CC}` | The `paymentMethod` isn't valid for that country in the creation validator | Use a method the country supports. If `/options` or compliance coverage lists a `(country, method)` that creation rejects, the compatibility tables are out of sync — confirm with support@borderless.xyz rather than working around it. |
-| `422 address.postalCode has invalid value for the given country` | The postal code doesn't match the destination country's expected format — some formats are validated strictly | Send a correctly formatted postal code for that country. A few country formats reject otherwise-plausible values; if every valid-looking value is rejected, flag it to support@borderless.xyz rather than guessing. |
-| `422 bankAccountNumber must be shorter than or equal to N characters` | The account number / IBAN exceeds the corridor's length bound | Some corridors validate a length ceiling — send the domestic account number where the full IBAN overflows, or the format the corridor expects. Confirm the corridor's shape in `data/corridors.json`. |
+| `422 {currency} does not match the country: {CC}. Possible currencies for the country: {CCY}` | The PI `currency` isn't valid for that country | Use the country's native currency (dollarized markets accept USD). |
+| `422 {method} does not match the country: {CC}` | The `paymentMethod` isn't valid for that country | Use a method the country supports — re-check `/withdrawals/options` for the corridor. |
+| `422 address.postalCode has invalid value for the given country` | The postal code doesn't match the destination country's expected format — some formats are validated strictly | Send a correctly formatted postal code for that country (e.g. a real 6-digit code for CN). |
+| `422 bankAccountNumber must be shorter than or equal to N characters` | The account number / IBAN exceeds the corridor's length bound | Send the account-number format the corridor expects (domestic format where a full IBAN overflows). Confirm the corridor's shape in `data/corridors.json`. |
 
 ### Institutions / bank-slug discovery
 
@@ -67,7 +67,7 @@ Bank slugs are **PFI-scoped**: the value for a given bank differs by the PFI rou
 |---|---|---|
 | `400 Payment instruction … is not usable on {PFI}: the stored institution slug is not present in {PFI}'s catalog` | Reused a PI whose `bankSlug` came from a different PFI than the one now routing the corridor | Re-discover slugs against the routing PFI and create a fresh PI. Do not reuse a slug across PFIs. |
 | `400 The service [{PFI}] is not available` on `/institutions` | That PFI doesn't expose institutions/slug discovery on this org *(org-dependent)* | Skip institutions discovery for that route and go straight to quote → PI → submit; PI shape is still validated at creation. |
-| `institutions` returns `allInstitutionsSupported: false` with an empty `supportedInstitutions` | No slug is published for the route | On withdrawals this is a hard block — submitting anyway fails with `No bankSlug found for payment instruction`; contact support@borderless.xyz to have the list populated. On deposits, some routes still create and settle with `details: {}` *(org-dependent)* — try PI creation first. |
+| `institutions` returns `allInstitutionsSupported: false` with an empty `supportedInstitutions` | The route's institution list isn't provisioned on your org yet | Withdrawals need a `bankSlug`, so ask support@borderless.xyz to provision the list before building that direction. Deposits are more permissive — some routes create and settle with `details: {}` *(org-dependent)* — so try the deposit direction first. |
 
 ### Withdrawals
 
@@ -131,8 +131,7 @@ The transaction returned `Submitted`. You polled or got a webhook. `status` is n
 | `bank.ifscCode is required` | Used `bankCode` for IN/IMPS_FIRC instead of `localRoutingCode` | Recreate the PI with `localRoutingCode` holding the IFSC. |
 | `bank.bsbNumber is required` (AU) / `bank.transitNumber is required` (CA) / `bank.bankCode is required` (JP) | Routing identifier missing | Add the routing field per the corridor's spec. AU and CA: `localRoutingCode`. JP: `bankCode`. |
 | `accountType is required` | Missing `bankAccountType` | Add `Checking` or `Savings`. |
-| `Failed to create account: Missing required fields: bank.{field}` (e.g. `bank.branchCode`, `bank.bankCode`) | The PI created fine but the corridor needs a routing/identifier field that isn't validated at creation time — it only surfaces when the PFI builds the account | Recreate the PI with the field set: branch/agência codes and JP bank codes go in `localRoutingCode` / `bankCode`. If the field the PFI names is `bank.iban` but PI creation rejects a top-level `iban` for that corridor (`iban should not exist`), no schema field maps to it — flag the route to support@borderless.xyz. |
-| `Failed to create account: ... address.postalCode (value "…" does not match expected format)`, `path: identity.address.postalCode` | Some corridors validate the **sender identity's own** address postal code against the destination country's format at PFI account creation — surfaces async, not at PI creation | The failing field is the sender identity's address, not the destination PI. Use a sender identity whose address postal code matches the destination country's format for that route, or confirm the requirement with support@borderless.xyz. |
+| `Failed to create account: Missing required fields: bank.{field}` (e.g. `bank.branchCode`, `bank.bankCode`) | The PI created fine but the corridor needs a routing/identifier field that isn't validated at creation time — it only surfaces when the PFI builds the account | Recreate the PI with the field set: branch/agência codes and JP bank codes go in `localRoutingCode` / `bankCode`. IBAN-family fields map from `bankAccountNumber`. |
 | `country code does not match` | Identity's `address.country` doesn't match the withdrawal's destination country (some PFIs require this) | Create / use an identity whose `address.country` matches the destination. |
 
 ### Compliance issues

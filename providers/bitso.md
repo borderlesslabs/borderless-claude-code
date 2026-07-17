@@ -2,7 +2,7 @@
 
 > Last verified: 2026-07 · Scope: provider-dependent unless noted. Routing is org-dependent — confirm with `GET /organizations/network?status=active`.
 
-Corridors observed: **CO/COP (PSE)**, **AR/ARS (COELSA)**, **MX/MXN (SPEI)**, both deposit and withdrawal directions. Bitso's deposit and withdrawal sides differ in enough details — asset lists, the `fromAmount` convention — that you should treat each direction as its own thing rather than assuming symmetry.
+Corridors observed: **CO/COP (PSE)**, **AR/ARS (COELSA)**, **MX/MXN (SPEI)**. Bitso's deposit and withdrawal sides differ in enough details — asset lists, the `fromAmount` convention — that you should treat each direction as its own thing rather than assuming symmetry. The deposit direction is verified end-to-end below (AR and MX completing in ~24s).
 
 ## Compliance behavior
 
@@ -21,8 +21,7 @@ Corridors observed: **CO/COP (PSE)**, **AR/ARS (COELSA)**, **MX/MXN (SPEI)**, bo
 
 ## Identity requirements
 
-- **Colombia (CO) rails require a valid Colombian NIT on the identity record itself.** A `taxId` set on the payment instruction's `details` does **not** substitute — the check reads the identity's tax data and returns `Invalid NIT` (`path: identity`) regardless of what the PI carries. Populate the identity's Colombian tax ID (format like `900123456-7`) before running any CO deposit or withdrawal. Until that field is present, all CO corridors return the same block *(org-dependent on the identity's data)*.
-- For Argentina, a withdrawal that fails at the PFI with `path: identity` may indicate an analogous identity-level tax ID (CUIT) requirement. If an ARS withdrawal does not clear on an otherwise-complete identity, coordinate with support@borderless.xyz.
+- **Colombia (CO) rails require a valid Colombian NIT on the identity record itself.** A `taxId` set on the payment instruction's `details` does **not** substitute — the check reads the identity's tax data and returns `Invalid NIT` (`path: identity`) regardless of what the PI carries. Populate the identity's Colombian tax ID (format like `900123456-7`) before running any CO deposit or withdrawal *(org-dependent on the identity's data)*.
 
 ## Payment instruction notes
 
@@ -52,11 +51,7 @@ Transaction limits observed (fiat side; convert the withdrawal `amount` from sou
 | `The service [Bitso] is not available.` (on `/institutions`) | Institutions discovery not exposed for Bitso — skip it, go quote → PI → submit |
 | `Invalid NIT` (`path: identity`) | CO rails need a valid Colombian NIT on the identity record; a PI-level `taxId` does not substitute |
 | `paymentPurpose` 422 with enum list | Use the lowercase value (`"other"`), not title case |
-| `Failed to create Bitso receiving account. Withdrawal account details are not valid…` | Observed on MXN/SPEI withdrawal beneficiary creation across payload variants — coordinate with support@borderless.xyz rather than iterating on PI shape *(org-dependent)* |
-| `Bitso request failed` (`path: identity`, ARS withdrawal) | Generic PFI-side result with no field detail — may indicate a missing identity-level tax ID (CUIT); coordinate with support@borderless.xyz |
 
 ## Sandbox notes
 
 - MXN/SPEI and ARS/COELSA **deposits** complete cleanly (Submitted → Pending → Completed in ~24s), and `pfiName` on the completed transaction holds as `Bitso` when pinned.
-- MXN/SPEI **withdrawal** beneficiary-account creation returned an identical validation error across several payment-instruction variants (different CLABE, different bank code, despaced field values). The message reads like a provider-side beneficiary-creation limitation on this sandbox, not a client-side field problem — the same identity/account works for the deposit direction. If you hit it, coordinate with support@borderless.xyz.
-- ARS/COELSA **withdrawal** returned a generic `Bitso request failed` with no actionable field detail on this sandbox. Confirm the identity's Argentine tax data with support before deeper debugging.

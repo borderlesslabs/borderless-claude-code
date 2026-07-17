@@ -25,5 +25,4 @@ Corridors observed: **CO (PSE)**. A single-corridor provider in the observations
 
 ## Sandbox notes
 
-- **`Orchestrating` is a distinct, non-terminal transaction status** — separate from `Submitted` / `Pending` / `Processing` / `Completed` / `Failed`. A withdrawal has been observed sitting in `Orchestrating` with a static `updatedAt` (no movement across repeated polls over several minutes) and `failureReason: null`. Because it never flips to `Failed`, the usual "re-poll past `Failed`" heuristic doesn't apply — there's nothing to re-poll past.
-- Treat an `Orchestrating` transaction whose `updatedAt` hasn't advanced across multiple poll cycles as stuck, not merely slow. This looks like a sandbox completion-simulation gap rather than anything client-fixable — if a withdrawal stays in `Orchestrating` past a few minutes, flag it to support@borderless.xyz with the transaction ID. *(Sandbox.)*
+- **`Orchestrating` is a distinct, non-terminal transaction status** — separate from `Submitted` / `Pending` / `Processing` / `Completed` / `Failed`. Poll it with a hard timeout like any non-terminal state; see the status table in `cookbook/error-catalog.md`.
