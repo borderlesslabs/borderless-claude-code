@@ -38,7 +38,8 @@ The async ones are the dangerous ones — your call returns 200, you assume succ
 
 | Status / Message | Cause | Fix |
 |---|---|---|
-| `422 iban should not exist` | Used the `iban` field on a corridor that doesn't accept it | Most corridors carry the IBAN in `bankAccountNumber`. The `iban` field is only valid on a few (AE/NPSS, PK/IBFT). |
+| `422 {field} should not exist` (any `details` field) | The PI `details` object is a strict per-corridor shape (a `oneOf`) — a field that belongs to one corridor's shape is rejected on another | Send only the fields the corridor's shape defines. IBAN-only shapes reject `bankName` / `accountHolderName` / `bankAccountNumber`; key-only shapes (BR/PIX `identifierValue`, CO/Bre-B `brebKey`) reject bank fields and `address`; mobile-money shapes reject `bankAccountNumber` and `address`. Look the shape up in `data/corridors.json` and confirm against the live `institutions` response. |
+| `422 iban should not exist` | Used the `iban` field on a corridor that doesn't accept it | Most corridors carry the IBAN in `bankAccountNumber`. The `iban` field is only valid on a few (AE/NPSS, EG/BankTransfer, PK/IBFT, and the Gulf/Levant BankTransfer/MADA rails). |
 | `422 bankName should not exist` (BR/PIX, AE/NPSS, PK/IBFT) | Included disallowed fields | PIX is identifier-based (`identifierType` + `identifierValue`). NPSS/IBFT take `iban` only. |
 | `422 sortCode should not exist` (GB/BankTransfer) | Included sort code | UK uses `bankAccountNumber` only. |
 | `422 localRoutingNumber should not exist` (IN/IMPS_FIRC) | Wrong field name | The IFSC code goes in `localRoutingCode`, not `localRoutingNumber`. |
@@ -46,6 +47,27 @@ The async ones are the dangerous ones — your call returns 200, you assume succ
 | `422 bsbNumber should not exist` (AU/BECS) | Wrong field name | The Australian BSB goes in `localRoutingCode`. |
 
 See the country-by-country `details` table in the `borderless-withdrawal-flow` skill for the full set.
+
+### Payment-instruction country & address validation
+
+PI creation enforces a country/currency/method compatibility table and per-country address formats. These checks run at creation time and can be stricter than a quote — clear them with correctly formatted local data.
+
+| Status / Message | Cause | Fix |
+|---|---|---|
+| `422 {currency} does not match the country: {CC}. Possible currencies for the country: {CCY}` | The PI `currency` isn't valid for that country | Use the country's native currency (dollarized markets accept USD). |
+| `422 {method} does not match the country: {CC}` | The `paymentMethod` isn't valid for that country | Use a method the country supports — re-check `/withdrawals/options` for the corridor. |
+| `422 address.postalCode has invalid value for the given country` | The postal code doesn't match the destination country's expected format — some formats are validated strictly | Send a correctly formatted postal code for that country (e.g. a real 6-digit code for CN). |
+| `422 bankAccountNumber must be shorter than or equal to N characters` | The account number / IBAN exceeds the corridor's length bound | Send the account-number format the corridor expects (domestic format where a full IBAN overflows). Confirm the corridor's shape in `data/corridors.json`. |
+
+### Institutions / bank-slug discovery
+
+Bank slugs are **PFI-scoped**: the value for a given bank differs by the PFI routing the corridor, and a slug stored on a PI from one PFI is not valid when another PFI routes the same corridor. Always re-discover with `GET /withdrawals/institutions?...&pfiName={the routing PFI}` (or `/deposits/institutions`) and build the PI from that response.
+
+| Status / Message | Cause | Fix |
+|---|---|---|
+| `400 Payment instruction … is not usable on {PFI}: the stored institution slug is not present in {PFI}'s catalog` | Reused a PI whose `bankSlug` came from a different PFI than the one now routing the corridor | Re-discover slugs against the routing PFI and create a fresh PI. Do not reuse a slug across PFIs. |
+| `400 The service [{PFI}] is not available` on `/institutions` | That PFI doesn't expose institutions/slug discovery on this org *(org-dependent)* | Skip institutions discovery for that route and go straight to quote → PI → submit; PI shape is still validated at creation. |
+| `institutions` returns `allInstitutionsSupported: false` with an empty `supportedInstitutions` | The route's institution list isn't provisioned on your org yet | Withdrawals need a `bankSlug`, so ask support@borderless.xyz to provision the list before building that direction. Deposits are more permissive — some routes create and settle with `details: {}` *(org-dependent)* — so try the deposit direction first. |
 
 ### Withdrawals
 
@@ -60,8 +82,10 @@ See the country-by-country `details` table in the `borderless-withdrawal-flow` s
 
 | Status / Message | Cause | Fix |
 |---|---|---|
-| `422 paymentMethod must be one of …` | Missing `paymentMethod` | Deposits require explicit `paymentMethod` — unlike withdrawals, the API does not auto-route. |
+| `422 paymentMethod must be one of …` | Missing `paymentMethod` | Deposits require explicit `paymentMethod` in the body even though the PI already encodes it — unlike withdrawals, the API does not auto-route. |
 | `422 fromAmount should not exist` | Used quote-style fields on a deposit | Deposits use `amount` (the fiat amount). Quotes use `fromAmount` / `toAmount`. |
+| `422 paymentPurpose should not exist` | Sent `paymentPurpose` on a deposit | `paymentPurpose` is **withdrawal-only** — remove it from the deposit body. |
+| `422 identityId should not exist` | Sent `identityId` on a deposit | Deposits infer the counterparty identity from `accountId` — omit `identityId`. |
 
 ### Accounts
 
@@ -107,6 +131,7 @@ The transaction returned `Submitted`. You polled or got a webhook. `status` is n
 | `bank.ifscCode is required` | Used `bankCode` for IN/IMPS_FIRC instead of `localRoutingCode` | Recreate the PI with `localRoutingCode` holding the IFSC. |
 | `bank.bsbNumber is required` (AU) / `bank.transitNumber is required` (CA) / `bank.bankCode is required` (JP) | Routing identifier missing | Add the routing field per the corridor's spec. AU and CA: `localRoutingCode`. JP: `bankCode`. |
 | `accountType is required` | Missing `bankAccountType` | Add `Checking` or `Savings`. |
+| `Failed to create account: Missing required fields: bank.{field}` (e.g. `bank.branchCode`, `bank.bankCode`) | The PI created fine but the corridor needs a routing/identifier field that isn't validated at creation time — it only surfaces when the PFI builds the account | Recreate the PI with the field set: branch/agência codes and JP bank codes go in `localRoutingCode` / `bankCode`. IBAN-family fields map from `bankAccountNumber`. |
 | `country code does not match` | Identity's `address.country` doesn't match the withdrawal's destination country (some PFIs require this) | Create / use an identity whose `address.country` matches the destination. |
 
 ### Compliance issues
@@ -124,7 +149,7 @@ The transaction returned `Submitted`. You polled or got a webhook. `status` is n
 |---|---|---|
 | `No suitable service` | Wrong `paymentMethod` for the corridor on this PFI | Re-discover via `/withdrawals/options`. |
 | `amount must be less than X USD` | Per-transaction limit hit | Reduce amount. Some corridors have low caps (e.g., NGN ≈ $3,164 USD per transaction). |
-| `Amount for {CCY} in {CC} is above maximum limit: N` | Per-transaction cap, quoted in destination fiat — but the withdrawal `amount` you sent is in the **source asset** (USDC) | Convert the fiat cap to source-asset units via a quote and stay under it (e.g. 100,000 TRY ≈ 2,900 USDC). |
+| `Amount for {CCY} in {CC} is above maximum limit: N` | Per-transaction cap, quoted in destination fiat — but the withdrawal `amount` you sent is in the **source asset** (USDC) | Convert the fiat cap to source-asset units via a quote and stay under it. The source-asset ceiling moves with FX — recompute it from the current quote's `exchangeRate` (`cap / exchangeRate`) rather than hardcoding a USDC figure. |
 | `address unavailable` | PFI hasn't provisioned a sandbox deposit address for this corridor | Provider-side issue. Contact support. |
 | `partner rate does not exist` | Asset/currency pair not supported by the routed PFI | Try a different asset (e.g., switch from `USDT_TRON` to `USDC_ETHEREUM`). |
 | `omnibus not configured for organization` | Backend configuration missing | Contact support. |
@@ -167,7 +192,7 @@ This is true even when the underlying problem was on the identity, not the PI it
 |---|---|---|
 | `Submitted` | Received and queued | Poll. |
 | `Verifying` | PFI KYC review in progress | Poll. |
-| `Orchestrating` | Borderless picking PFI / preparing | Poll. |
+| `Orchestrating` | Borderless picking the PFI / preparing the transfer. Non-terminal. | Poll. On some routes this can sit far past the usual settlement window before moving to `Completed` or `Failed`, and a stalled one can eventually fail with a generic message. Poll with a hard timeout; treat a long-static `updatedAt` as not-yet-settled, not an error. **Never resubmit a still-`Orchestrating` transaction** — reuse the same `idempotency-key` if you retry the poll, not a new transaction. |
 | `Pending` | Awaiting action from sender (deposit) or `withdrawalOnchainInstruction` populated (withdrawal) | Take the next step in the flow. |
 | `Processing` | Funds moving on the PFI side | Poll. |
 | `Completed` | Done. Terminal. | — |

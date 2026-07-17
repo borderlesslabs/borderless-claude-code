@@ -1,24 +1,42 @@
 # Infinia — integration notes
 
-> Last verified: 2026-04 · Scope: provider-dependent unless noted. Routing is org-dependent — confirm with `GET /organizations/network?status=active`.
+> Last verified: 2026-07 · Scope: provider-dependent unless noted. Routing is org-dependent — confirm with `GET /organizations/network?status=active`.
 
-Corridors observed: **BR/PIX**, **MX/SPEI**, **AR/COELSA**.
+Corridors observed: **BR/PIX**, **MX/SPEI**, **AR/COELSA**, **CL/SPAV**, **CO/PSE**, **PE/CCE**, **PY/SPI**. Broad LATAM coverage under a single PreApproved compliance profile.
 
 ## Compliance behavior
 
-- **`PreApproved`** — no ToS, no initiation, transact immediately. A great first corridor for proving out your integration end-to-end.
+- **`PreApproved`** — no ToS, no initiation, transact immediately. A great first corridor for proving out your integration end-to-end. One `Infinia_base` check covers every corridor above (deposit and withdrawal); there is no separate per-corridor compliance profile to drive.
 
 ## Payment instruction notes
 
-- **BR/PIX:** identifier-based (`identifierType` + `identifierValue`); `bankName` is not part of this DTO. `identifierType` ∈ `Email` / `CPF` / `CNPJ` / `PhoneNumber` / `EVP`.
-- **MX/SPEI:** the 18-digit CLABE goes in `bankAccountNumber`.
-- **AR/COELSA:** 22-digit CBU in `bankAccountNumber`. Identity and account preflight requirements differ by routed PFI — check the corridor's live `requirements` and `institutions` responses rather than assuming another provider's rules apply.
+Institution discovery (`GET /deposits|withdrawals/institutions`) returns `allInstitutionsSupported:true` for the LATAM rails, so no bank slug is strictly required. The `institutionIdentifier` hint in that response tells you the PI convention per corridor:
+
+- **BR/PIX:** identifier-based (`identifierType` + `identifierValue`; `institutionIdentifier` hint is `identifierValue`). `bankName` is not part of this DTO. `identifierType` ∈ `Email` / `CPF` / `CNPJ` / `PhoneNumber` / `EVP`.
+- **CL/SPAV, CO/PSE, PE/CCE, PY/SPI:** standard bank fields (`bankName`, `accountHolderName`, `bankAccountNumber`, `bankAccountType`, `address`) with the institution identifier carried as **`bankCode`** (not `bankSlug` — confirmed against a live CO/PSE PI carrying `bankCode: "007"`).
+- **MX/SPEI:** the 18-digit CLABE goes in `bankAccountNumber`; standard bank fields, no identifier hint beyond them.
+- **AR/COELSA:** 22-digit CBU in `bankAccountNumber`; standard bank fields, no identifier hint beyond them.
+
+Request-body notes (enforced at the Borderless API layer, but every integrator hits them here):
+
+- **`POST /deposits` requires an explicit `paymentMethod`; `POST /withdrawals` REJECTS it** (`paymentMethod should not exist` — the withdrawal's method comes from the payment instruction). Omitting it on a deposit 422s with the full method enum (`ACH, Wire, Sepa, Swift, Card, MobileMoney, PIX, TED, PSE, SPEI, COELSA, Transfers30, SPAV, CCE, SPI, LBTR, SINPE, Transfer365, NIP, GhIPSS, BankTransfer, EFT, RTP, BECS, FPS, IMPS_FIRC, Breb, NPSS, MADA, ZAHAV, IBFT, SIC`). Send the corridor's method (e.g. `SPEI`, `PIX`, `PSE`).
+- **`paymentPurpose` is withdrawal-only** and comes from a closed enum (`salary payment, personal remittance, rent payment, property purchase, owned account abroad, advertising expenses, advisory fees, business insurance, construction, delivery fees, education, exports, donation, hotel, loan payment, maintenance expenses, medical expense, office expenses, royalty fees, service charge, shares investment, tax payment, transportation fees, travel, utility bills, other`). `other` is a safe default; a free-text value 422s. Deposits reject the field entirely (`paymentPurpose should not exist`).
 
 ## Limits
 
-- BRL and MXN: **100,000 per transaction** (fiat side) observed. The withdrawal `amount` is in source-asset units — convert before checking.
+- Per-transaction caps are quote-dependent — read `minAmount` / `maxAmount` from the corridor quote. Recent sandbox quotes returned `minAmount: 1.00` (fiat side) and `maxAmount: null` (uncapped) across the LATAM rails. Withdrawal `amount` is in source-asset units (e.g. USDC); deposit `fromAmount` is fiat — convert before checking any cap.
+
+## Message signatures
+
+| Message | Meaning → next step |
+|---|---|
+| `paymentMethod must be one of the following values: …` (deposit) | Add an explicit `paymentMethod` to the deposit body |
+| `paymentMethod should not exist` (withdrawal) | Withdrawals take the method from the PI — drop the field |
+| `paymentPurpose must be one of the following values: …` | Use a value from the closed enum; `other` is a safe default |
+| `paymentPurpose should not exist` | Drop `paymentPurpose` from a deposit body (withdrawal-only field) |
 
 ## Sandbox notes
 
-- Fast: withdrawals typically reach `Completed` in ~15 seconds — useful as the control corridor when debugging slower flows.
-- If you ever see a corridor-wide configuration error here (affecting every payload shape), escalate to support@borderless.xyz rather than debugging your request — config-level items are resolved quickly on the network side.
+- **Fast:** withdrawals have been observed reaching `Completed` in ~15 seconds, which makes Infinia a useful control corridor when debugging slower flows.
+- Deposit `instructions` populate from `null` a few seconds after submission (a hosted-redirect payload ~10s in) — that transition is normal issuance, not a compliance signal.
+- If a failure affects every corridor identically on your org (same `failureReason` across currencies and directions), escalate to support@borderless.xyz rather than debugging your payload — corridor-wide patterns are configuration-level and resolve on the network side.
