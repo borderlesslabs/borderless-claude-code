@@ -19,7 +19,7 @@ Institution discovery (`GET /deposits|withdrawals/institutions`) returns `allIns
 
 Request-body notes (enforced at the Borderless API layer, but every integrator hits them here):
 
-- **`POST /deposits` and `POST /withdrawals` both require an explicit `paymentMethod`** even though the endpoint could infer direction from the PI/asset. Omitting it 422s with the full method enum (`ACH, Wire, Sepa, Swift, Card, MobileMoney, PIX, TED, PSE, SPEI, COELSA, Transfers30, SPAV, CCE, SPI, LBTR, SINPE, Transfer365, NIP, GhIPSS, BankTransfer, EFT, RTP, BECS, FPS, IMPS_FIRC, Breb, NPSS, MADA, ZAHAV, IBFT, SIC`). Send the corridor's method (e.g. `SPEI`, `PIX`, `PSE`).
+- **`POST /deposits` requires an explicit `paymentMethod`; `POST /withdrawals` REJECTS it** (`paymentMethod should not exist` — the withdrawal's method comes from the payment instruction). Omitting it on a deposit 422s with the full method enum (`ACH, Wire, Sepa, Swift, Card, MobileMoney, PIX, TED, PSE, SPEI, COELSA, Transfers30, SPAV, CCE, SPI, LBTR, SINPE, Transfer365, NIP, GhIPSS, BankTransfer, EFT, RTP, BECS, FPS, IMPS_FIRC, Breb, NPSS, MADA, ZAHAV, IBFT, SIC`). Send the corridor's method (e.g. `SPEI`, `PIX`, `PSE`).
 - **`paymentPurpose` is withdrawal-only** and comes from a closed enum (`salary payment, personal remittance, rent payment, property purchase, owned account abroad, advertising expenses, advisory fees, business insurance, construction, delivery fees, education, exports, donation, hotel, loan payment, maintenance expenses, medical expense, office expenses, royalty fees, service charge, shares investment, tax payment, transportation fees, travel, utility bills, other`). `other` is a safe default; a free-text value 422s. Deposits reject the field entirely (`paymentPurpose should not exist`).
 
 ## Limits
@@ -30,7 +30,8 @@ Request-body notes (enforced at the Borderless API layer, but every integrator h
 
 | Message | Meaning → next step |
 |---|---|
-| `paymentMethod must be one of the following values: …` | Add an explicit `paymentMethod` to the deposit/withdrawal body |
+| `paymentMethod must be one of the following values: …` (deposit) | Add an explicit `paymentMethod` to the deposit body |
+| `paymentMethod should not exist` (withdrawal) | Withdrawals take the method from the PI — drop the field |
 | `paymentPurpose must be one of the following values: …` | Use a value from the closed enum; `other` is a safe default |
 | `paymentPurpose should not exist` | Drop `paymentPurpose` from a deposit body (withdrawal-only field) |
 | `ACH does not match the country: BO` at BO discovery | Discovery/quote validator out of sync with `/options` for BO/ACH on some orgs → support@borderless.xyz *(org-dependent)* |

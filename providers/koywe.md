@@ -27,7 +27,7 @@ Koywe runs some of the most thorough data validation in the network — real loc
 - **AR account numbers are a 22-digit CBU/CVU**, exactly.
 - **MX/SPEI:** `{bankName, accountHolderName, bankAccountNumber (18-digit CLABE), address}` — no `bankSlug` needed. **The CLABE's mod-10 check digit is validated at payout** ("Bank account is invalid … and belong to …" when it fails). Koywe is stricter here than the corridor's other providers, so a synthetic CLABE that works elsewhere can fail on Koywe — compute a valid check digit (weights 3,7,1 over the first 17 digits).
 - **Destination-account ownership is verified**: the CBU must belong to the tax-ID holder — a strong protection against misdirected payouts. Fabricated sandbox data won't pass this check by design; request PFI-issued test credentials through support@borderless.xyz for end-to-end sandbox testing.
-- **Withdrawal bodies require both `paymentMethod` and `paymentPurpose`.** `POST /withdrawals` rejects a body missing `paymentMethod` (full method enum returned) and also requires `paymentPurpose` from a closed enum (`salary payment, personal remittance, rent payment, property purchase, owned account abroad, advertising expenses, advisory fees, business insurance, construction, delivery fees, education, exports, donation, hotel, loan payment, maintenance expenses, medical expense, office expenses, royalty fees, service charge, shares investment, tax payment, transportation fees, travel, utility bills, other`) — `other` is a safe default.
+- **Withdrawal bodies require `paymentPurpose` and reject `paymentMethod`** (`paymentMethod should not exist` — the method comes from the payment instruction; verified live 2026-07). `paymentPurpose` comes from a closed enum (`salary payment, personal remittance, rent payment, property purchase, owned account abroad, advertising expenses, advisory fees, business insurance, construction, delivery fees, education, exports, donation, hotel, loan payment, maintenance expenses, medical expense, office expenses, royalty fees, service charge, shares investment, tax payment, transportation fees, travel, utility bills, other`) — `other` is a safe default.
 - **Deposit bodies require `paymentMethod` but reject `paymentPurpose`** (`paymentPurpose should not exist`). The field is withdrawal-only.
 
 ## Limits
@@ -55,7 +55,7 @@ A full MX **deposit and withdrawal** pair completed on a fresh sandbox org follo
 | `Account number must be 22 digits long (CBU or CVU)` | Use the exact 22-digit AR format |
 | `The country code of the bank account does not match the user's registered country` | Withdrawal identity's `address.country` ≠ destination → use an identity registered in the destination country |
 | `accountType is required and must be one of: checking,savings,interbanking` | Add `bankAccountType` to PI details |
-| `paymentMethod must be one of the following values: …` | Add `paymentMethod` to the deposit/withdrawal body |
+| `paymentMethod must be one of the following values: …` (deposit) | Add `paymentMethod` to the deposit body |
 | `paymentPurpose should not exist` | Drop `paymentPurpose` from a deposit body (withdrawal-only field) |
 | `Failed to validate if bank account … belongs to …` | Ownership verification vs test data → request test credentials via support |
 | `Provider credentials are invalid` (deposit, at settlement) | Usually the identity-country rule surfacing under a generic message (mapping fix in progress) → use an identity registered in the corridor country |
