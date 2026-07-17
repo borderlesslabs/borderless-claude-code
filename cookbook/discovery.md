@@ -66,6 +66,7 @@ They still respond, but the network endpoint is where new capability (and the ac
 
 ## Related
 
+- `cookbook/provider-pinning.md` — when you want a *specific* PFI rather than the default: thread `pfiName` through rungs 2–5 consistently, and verify it on the returned transaction.
 - Step-0 discovery inside each flow: `borderless-deposit-flow`, `borderless-withdrawal-flow`.
 - Per-provider behavior once you know who routes your corridor: `providers/README.md`.
 - Corridor field requirements snapshot: `data/corridors.json` (live discovery is authoritative).

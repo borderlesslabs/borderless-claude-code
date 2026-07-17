@@ -92,6 +92,8 @@ Identity  →  Compliance Check  →  Account  →  Transaction
 - **Webhook marked `enabled: false`** — delivery exhausted its retry budget. Your endpoint returned non-200 or errored. Re-enable via `PATCH /notifications/webhooks/settings/{id}`. See `cookbook/webhook-replay.md`.
 - **`Validation error from PFI` with no detail on retry** — the previous attempt tainted the payment instruction on the PFI side. Create a fresh PI and resubmit. See `cookbook/error-catalog.md`.
 - **Asset appears in `/options` but the transaction fails** ("No suitable ramp config", asset mismatch) — the asset came from an inactive provider's config. Validate against `GET /organizations/network?status=active`. See `cookbook/discovery.md`.
+- **`POST /deposits` needs an explicit `paymentMethod`** in the body even though the payment instruction already encodes it — omitting it 422s with the full `paymentMethod` enum. Deposits do **not** auto-route the way withdrawals do. Deposits also reject `paymentPurpose` (`paymentPurpose should not exist`) — it is a withdrawal-only field.
+- **`paymentPurpose` is a lowercase enum** — values are lowercase strings with spaces (`other`, `salary payment`, `personal remittance`, …). A capitalized value like `Other` 422s with the full list.
 
 For a full message → cause → fix table (sync 4xx and async PFI failures), see `cookbook/error-catalog.md`. When a failure names a specific PFI (`pfiName` on the transaction), check that provider's page under `providers/` for its known message signatures.
 
@@ -154,6 +156,7 @@ Each example is a standalone TypeScript project. The `FORK HERE` comment on the 
 ## Cookbook
 
 - `cookbook/discovery.md` — the endpoint ladder for validating what your org can actually do (start here before building any corridor).
+- `cookbook/provider-pinning.md` — selecting a specific PFI with `pfiName` across the whole discovery ladder (vs. relying on default routing).
 - `cookbook/amount-handling.md` — decimal types, never floats.
 - `cookbook/error-catalog.md` — sync + async error message → cause → fix.
 - `cookbook/reconciliation.md` — recovering after a webhook gap.
