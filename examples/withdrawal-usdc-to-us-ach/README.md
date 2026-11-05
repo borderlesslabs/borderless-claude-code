@@ -1,6 +1,6 @@
 # Withdrawal: USDC on Polygon → US ACH
 
-A minimal, runnable example of the Borderless withdrawal (off-ramp) flow in TypeScript. The client sends USDC on Polygon on-chain; USD lands in the destination bank account via ACH.
+A minimal, runnable example of the Borderless withdrawal (offramp) flow in TypeScript. The client sends USDC on Polygon on-chain; USD lands in the destination bank account via ACH.
 
 ## What this covers
 

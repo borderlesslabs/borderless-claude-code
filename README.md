@@ -75,8 +75,8 @@ The toolbox auto-loads context for the six core Borderless flows. Each has a ded
 | Flow | When to use | Skill |
 |---|---|---|
 | **Compliance** | Onboard a personal or business identity, run KYC/KYB for a corridor, handle ToS acceptance, upload documents | `borderless-compliance-flow` |
-| **Deposit** (on-ramp) | One-off fiat → stablecoin transfers via ACH, Wire, PIX, SPEI, etc. | `borderless-deposit-flow` |
-| **Withdrawal** (off-ramp) | Stablecoin → fiat to a customer's bank account. Includes the per-corridor `details` table covering 18+ corridors and the seven `details` DTO variants | `borderless-withdrawal-flow` |
+| **Deposit** (onramp) | One-off fiat → stablecoin transfers via ACH, Wire, PIX, SPEI, etc. | `borderless-deposit-flow` |
+| **Withdrawal** (offramp) | Stablecoin → fiat to a customer's bank account. Includes the per-corridor `details` table covering 18+ corridors and the seven `details` DTO variants | `borderless-withdrawal-flow` |
 | **Virtual accounts** | Named bank accounts created in the identity's name with stable deposit instructions for recurring first-party funding — the end user moves fiat from their own external accounts on a recurring basis without a per-deposit API call. First-party only; not for third-party collection. | `borderless-virtual-account-flow` |
 | **Webhooks** | Signed event delivery: signature verification (TS/Python/Go), idempotency on event `id`, auto-disable handling, the `WebhookEventEntity` delivery log | `borderless-webhook-verifier` |
 

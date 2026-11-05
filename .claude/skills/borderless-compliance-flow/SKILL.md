@@ -32,7 +32,7 @@ Pick the right type:
 
 **Choosing the archetype:** the real compliance matrix is **provider × country × customer type** — requirements differ along all three axes. Two patterns that matter:
 
-- **Consumer / end-user flows → model end users as personal identities.** Personal KYC often approves automatically in sandbox where business KYB includes review steps. If your product off-ramps for individual end users, create each as `POST /identities/personal` with their own account and payment instruction — don't funnel them through one corporate identity.
+- **Consumer / end-user flows → model end users as personal identities.** Personal KYC often approves automatically in sandbox where business KYB includes review steps. If your product offramps for individual end users, create each as `POST /identities/personal` with their own account and payment instruction — don't funnel them through one corporate identity.
 - **Local residents carry local KYC requirements.** An identity resident in the destination country can require country-specific documents that a foreign identity doesn't (e.g. Nigeria: `BVN_NG` + `NationalId` for NG-resident individuals; some PFIs require `citizenship` on the person). The `requirements` endpoint is per-identity — query it for **each** identity rather than generalizing from the first one.
 
 **UBO structure (business identities):** each UBO must be a separate personal identity referenced by `personalIdentityId` — inline names are rejected. Required companions: `controlPersonTitle` when `hasControl: true`, `ownershipPercentage` when `hasOwnership: true`, and `attestedOwnershipStructureAt` as a real `YYYY-MM-DD` date (not null).

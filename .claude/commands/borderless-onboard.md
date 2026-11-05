@@ -399,7 +399,7 @@ Print:
 
 What's next:
   - CLAUDE.md is the workspace context. Skim it.
-  - /borderless-withdrawal-flow for off-ramps (needs a payment instruction first).
+  - /borderless-withdrawal-flow for offramps (needs a payment instruction first).
   - /borderless-webhook-verifier to wire up signed event handlers.
   - cookbook/ for reconciliation, webhook replay, and amount handling.
   - /borderless-install-into <path> when you're ready to move the Borderless

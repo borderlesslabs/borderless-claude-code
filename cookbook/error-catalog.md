@@ -32,9 +32,9 @@ The async ones are the dangerous ones — your call returns 200, you assume succ
 | Status / Message | Cause | Fix |
 |---|---|---|
 | `422 amount should not exist` + `one of fromAmount or toAmount should be specified` | Used `amount` on a quotes endpoint | Quotes use `fromAmount` (source) **or** `toAmount` (destination). Transactions use `amount`. They are not interchangeable. |
-| `400 No suitable service for the given payload` | Corridor not active for your org, or wrong `paymentMethod` for the corridor | Confirm with `/withdrawals/options` (off-ramp) or `/deposits/options` (on-ramp). A corridor that appears in `options` but errors here is provisioned in name only. |
+| `400 No suitable service for the given payload` | Corridor not active for your org, or wrong `paymentMethod` for the corridor | Confirm with `/withdrawals/options` (offramp) or `/deposits/options` (onramp). A corridor that appears in `options` but errors here is provisioned in name only. |
 
-### Payment instructions (off-ramp)
+### Payment instructions (offramp)
 
 | Status / Message | Cause | Fix |
 |---|---|---|

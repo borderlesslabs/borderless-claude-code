@@ -12,7 +12,7 @@ I'm migrating from **{Bridge direct / Circle / Fern / Conduit / Alchemy Pay / Ch
    |---|---|---|---|
    | (e.g., `User.kyc_status`) | `app/models/user.rb:42` | Identity + compliance check per corridor | One-to-many: a single user now has N compliance checks, one per `{PFI, country, asset, fiat, paymentMethod}` combo. |
 
-   Cover: identity / KYC, wallet / account, payout destination (payment instruction), on-ramp / off-ramp, webhook events, reconciliation keys.
+   Cover: identity / KYC, wallet / account, payout destination (payment instruction), onramp / offramp, webhook events, reconciliation keys.
 
 2. **Flag behavioral differences** that will break my current assumptions. At minimum:
    - Does my current provider use a single global KYC per user? Borderless's compliance is per-corridor — walk through what this means for my UX.

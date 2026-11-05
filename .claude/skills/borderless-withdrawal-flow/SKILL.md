@@ -1,9 +1,9 @@
 ---
 name: borderless-withdrawal-flow
-description: Use when building or debugging a Borderless withdrawal (off-ramp) flow — converting stablecoins into local fiat currency. Covers payment instruction creation, withdrawal transaction submission, and the on-chain stablecoin transfer to the PFI. Triggers on mentions of withdrawals, off-ramp, stablecoin-to-fiat, pay-out, payouts, or sending fiat to a bank account via a Borderless integration.
+description: Use when building or debugging a Borderless withdrawal (offramp) flow — converting stablecoins into local fiat currency. Covers payment instruction creation, withdrawal transaction submission, and the on-chain stablecoin transfer to the PFI. Triggers on mentions of withdrawals, offramp, stablecoin-to-fiat, pay-out, payouts, or sending fiat to a bank account via a Borderless integration.
 ---
 
-# Borderless Withdrawal Flow (Off-Ramp)
+# Borderless Withdrawal Flow (Offramp)
 
 A withdrawal converts stablecoin → local fiat. The client sends stablecoins on-chain to the PFI's deposit address. The PFI then sends local fiat to a bank account specified by a **Payment Instruction** that you create up front.
 
