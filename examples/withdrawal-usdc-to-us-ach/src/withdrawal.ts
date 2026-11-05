@@ -1,6 +1,6 @@
 // src/withdrawal.ts
 // End-to-end withdrawal orchestration: payment instruction → quote → create →
-// capture on-chain instruction → validate with onchain-guard → stop.
+// capture onchain instruction → validate with onchain-guard → stop.
 
 import Decimal from 'decimal.js';
 import { borderless } from './client.js';

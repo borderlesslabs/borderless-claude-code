@@ -1,6 +1,6 @@
 # Amount handling
 
-Every amount in the Borderless API — `amount`, `fromAmount`, `toAmount`, `fee`, `orchestrationFee`, `exchangeRate`, `developerFee`, corridor `limits` — is a **decimal string in natural units**. `"10.50"` means 10.50 USD, or 10.50 USDC, depending on context. Not 1050 cents. Not an on-chain integer with 6 decimals of precision.
+Every amount in the Borderless API — `amount`, `fromAmount`, `toAmount`, `fee`, `orchestrationFee`, `exchangeRate`, `developerFee`, corridor `limits` — is a **decimal string in natural units**. `"10.50"` means 10.50 USD, or 10.50 USDC, depending on context. Not 1050 cents. Not an onchain integer with 6 decimals of precision.
 
 **Which currency is "context"?** On **withdrawals**, `amount` is in the **source asset** (USDC/USDT). On **deposits**, `amount` is in the **fiat** the originator sends. Per-corridor transaction caps are usually stated in fiat or USD-equivalent — get a quote to convert before comparing a withdrawal amount against a fiat-denominated cap.
 
@@ -47,7 +47,7 @@ Amounts across `fiat` and `asset` are not directly comparable. A deposit with `a
 ## Precision rules per currency
 
 - **Fiat:** 2 decimal places standard (USD, EUR, BRL). A few zero-decimal currencies exist (JPY, KRW). Don't assume 2 universally — store whatever precision the API returns.
-- **Stablecoins:** natural units, typically 2 decimals for display. On-chain the same asset uses 6 (USDC) or 18 (DAI) decimals — the Borderless API hides this. Never convert to on-chain integer units except at the moment of broadcasting a withdrawal transfer.
+- **Stablecoins:** natural units, typically 2 decimals for display. Onchain the same asset uses 6 (USDC) or 18 (DAI) decimals — the Borderless API hides this. Never convert to onchain integer units except at the moment of broadcasting a withdrawal transfer.
 
 ## Display to end users
 

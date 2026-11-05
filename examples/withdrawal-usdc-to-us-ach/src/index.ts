@@ -1,6 +1,6 @@
 // src/index.ts
 // Entry point. Reads env, sets corridor, runs a withdrawal up to (not
-// including) on-chain broadcast.
+// including) onchain broadcast.
 
 import 'dotenv/config';
 import { getOrCreatePaymentInstruction } from './payment-instruction.js';

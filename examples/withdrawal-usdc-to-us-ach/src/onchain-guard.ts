@@ -1,5 +1,5 @@
 // src/onchain-guard.ts
-// Safety check: validates the planned on-chain transfer matches the PFI's
+// Safety check: validates the planned onchain transfer matches the PFI's
 // withdrawalOnchainInstruction before broadcasting.
 //
 // Lost stablecoins are not refundable. Any withdrawal code in your codebase

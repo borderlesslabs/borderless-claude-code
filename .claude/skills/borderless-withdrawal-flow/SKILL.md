@@ -1,11 +1,11 @@
 ---
 name: borderless-withdrawal-flow
-description: Use when building or debugging a Borderless withdrawal (offramp) flow — converting stablecoins into local fiat currency. Covers payment instruction creation, withdrawal transaction submission, and the on-chain stablecoin transfer to the PFI. Triggers on mentions of withdrawals, offramp, stablecoin-to-fiat, pay-out, payouts, or sending fiat to a bank account via a Borderless integration.
+description: Use when building or debugging a Borderless withdrawal (offramp) flow — converting stablecoins into local fiat currency. Covers payment instruction creation, withdrawal transaction submission, and the onchain stablecoin transfer to the PFI. Triggers on mentions of withdrawals, offramp, stablecoin-to-fiat, pay-out, payouts, or sending fiat to a bank account via a Borderless integration.
 ---
 
 # Borderless Withdrawal Flow (Offramp)
 
-A withdrawal converts stablecoin → local fiat. The client sends stablecoins on-chain to the PFI's deposit address. The PFI then sends local fiat to a bank account specified by a **Payment Instruction** that you create up front.
+A withdrawal converts stablecoin → local fiat. The client sends stablecoins onchain to the PFI's deposit address. The PFI then sends local fiat to a bank account specified by a **Payment Instruction** that you create up front.
 
 This has **one more step than a deposit** because you must tell the PFI where the fiat should land.
 
@@ -17,8 +17,8 @@ This has **one more step than a deposit** because you must tell the PFI where th
 0. Discover the corridor          → GET  /withdrawals/options + /withdrawals/institutions   (run before building the PI)
 (optional) Get quote              → GET  /withdrawals/quotes
 1. Create payment instruction     → POST /identities/{id}/payment-instructions   → returns paymentInstructionId
-2. Create withdrawal              → POST /withdrawals                             → returns on-chain instructions (deposit address)
-3. Send stablecoin on-chain       → out-of-band, from the account's wallet       (exact amount, exact fromAddress, exact toAddress)
+2. Create withdrawal              → POST /withdrawals                             → returns onchain instructions (deposit address)
+3. Send stablecoin onchain       → out-of-band, from the account's wallet       (exact amount, exact fromAddress, exact toAddress)
 4. PFI releases fiat              → webhook: Transaction_Updated → status: Completed
 ```
 
@@ -186,7 +186,7 @@ Body:
 
 The `documents` array is required for invoice-corridor withdrawals (India, Ghana, China, and Brazil over 50,000 BRL). Supported formats: JPEG / PNG / PDF, base64 data URI, min 200×200 px, max 5 MB. Skipping it does not 422 — the withdrawal submits, then transitions to `Failed` with "please upload an invoice…".
 
-**`refundAddress`** is the crypto address Borderless will return funds to if the withdrawal fails or is rejected after you've broadcast the on-chain transfer. Defaults to the same address you sent from. Worth setting explicitly when your wallet infrastructure can spend from multiple addresses but you want refunds to a single sweep account.
+**`refundAddress`** is the crypto address Borderless will return funds to if the withdrawal fails or is rejected after you've broadcast the onchain transfer. Defaults to the same address you sent from. Worth setting explicitly when your wallet infrastructure can spend from multiple addresses but you want refunds to a single sweep account.
 
 **`amount` is denominated in the source asset** (USDC/USDT), not the destination fiat. Per-corridor caps are usually expressed in fiat (e.g. 100,000 TRY, 30M NGN) or USD-equivalent — convert via a quote before comparing, and expect the cap error to quote either denomination.
 
@@ -209,7 +209,7 @@ The response returns the transaction but `withdrawalOnchainInstruction` is usual
 }
 ```
 
-## 3. Send stablecoins on-chain
+## 3. Send stablecoins onchain
 
 Transfer the stablecoins from the account's wallet to `withdrawalOnchainInstruction.toAddress`.
 
@@ -223,9 +223,9 @@ The `asset` field encodes the network (`USDC_POLYGON`, `USDC_BASE`, `USDT_TRON`,
 
 ## 4. PFI releases fiat
 
-Once the PFI detects the on-chain transfer and reconciles all three fields above, it issues the fiat payment per the payment instruction. The transaction status progresses to `Completed`.
+Once the PFI detects the onchain transfer and reconciles all three fields above, it issues the fiat payment per the payment instruction. The transaction status progresses to `Completed`.
 
-`txHash` on the transaction record is an **array of strings** (`txHash: string[]`) — not a single hash. It's empty at creation and populates with the hash(es) of **your** stablecoin transfer after it lands on-chain; most flows end with one entry, but some (e.g., ERC-20 approve + transfer) add more than one.
+`txHash` on the transaction record is an **array of strings** (`txHash: string[]`) — not a single hash. It's empty at creation and populates with the hash(es) of **your** stablecoin transfer after it lands onchain; most flows end with one entry, but some (e.g., ERC-20 approve + transfer) add more than one.
 
 ## Lifecycle summary
 
@@ -239,7 +239,7 @@ The full `TransactionStatus` enum is: `Submitted`, `Verifying`, `Orchestrating`,
 | `Verifying` | PFI KYC review in progress (only on PFIs that require it). |
 | `Orchestrating` | Borderless is selecting the PFI and preparing execution data. |
 | `Pending` | Awaiting action from the sender — `withdrawalOnchainInstruction` is usually populated in this state and the caller is expected to broadcast the stablecoin transfer. |
-| `Processing` | Stablecoin transfer received on-chain and reconciled; fiat payout in flight. |
+| `Processing` | Stablecoin transfer received onchain and reconciled; fiat payout in flight. |
 | `Completed` | Fiat delivered to the payment instruction's bank. Terminal. |
 | `Failed` | See `failureReason.details[].pfiErrorMessage`. Terminal. |
 | `Cancelled` | Cancelled by the caller or by the PFI. Terminal. |
@@ -260,7 +260,7 @@ Borderless cannot refund stablecoins sent incorrectly. The PFI may not be able t
 POST /transactions/{id}/cancel
 ```
 
-Only works from non-terminal early states (`Submitted`, `Verifying`, `Orchestrating`, `Pending`). Critically: once you broadcast the on-chain stablecoin transfer — even if the transaction is still in `Pending` — the PFI will reconcile and progress to `Processing`, after which cancellation is no longer possible and the fiat leg will complete.
+Only works from non-terminal early states (`Submitted`, `Verifying`, `Orchestrating`, `Pending`). Critically: once you broadcast the onchain stablecoin transfer — even if the transaction is still in `Pending` — the PFI will reconcile and progress to `Processing`, after which cancellation is no longer possible and the fiat leg will complete.
 
 ## Common pitfalls when generating code
 

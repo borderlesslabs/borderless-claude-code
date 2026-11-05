@@ -117,7 +117,7 @@ This happens **outside Borderless** over the traditional fiat rail (ACH, Wire, F
 
 Once the PFI reconciles the incoming fiat, it releases stablecoin to the destination account's wallet address. The transaction progresses through the statuses in the table below — typically `Submitted` → `Verifying` → `Orchestrating` → `Pending` → `Processing` → `Completed`. Failures end in `Failed` with a `failureReason`.
 
-`txHash` on the transaction record is an **array of strings** (`txHash: string[]`) — not a single hash. It's empty at creation and populates after the PFI broadcasts on-chain; most flows end with one entry, but some (e.g., ERC-20 approve + transfer) add more than one.
+`txHash` on the transaction record is an **array of strings** (`txHash: string[]`) — not a single hash. It's empty at creation and populates after the PFI broadcasts onchain; most flows end with one entry, but some (e.g., ERC-20 approve + transfer) add more than one.
 
 ## Lifecycle summary
 
