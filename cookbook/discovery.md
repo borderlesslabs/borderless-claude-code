@@ -1,6 +1,6 @@
 # Discovery — validate what your org can actually do, before you build
 
-Every corridor question ("can I off-ramp MXN?", "which asset should this account hold?", "do I need a bankSlug?") has a live API answer. This page is the endpoint ladder, from most authoritative to most specific, and the traps between them.
+Every corridor question ("can I offramp MXN?", "which asset should this account hold?", "do I need a bankSlug?") has a live API answer. This page is the endpoint ladder, from most authoritative to most specific, and the traps between them.
 
 **Why this matters:** the discovery endpoints answer *different* questions, and using the wrong one produces integrations that pass discovery and then fail at transaction time. The most common version: an asset appears in `/withdrawals/options`, you build against it, and the withdrawal fails — because the asset came from a ramp config whose provider isn't active on your org.
 

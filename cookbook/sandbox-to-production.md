@@ -42,7 +42,7 @@ This doc is a punch list. Walk it before flipping any switch.
 - [ ] Production wallet addresses registered on accounts (sandbox addresses are not portable).
 - [ ] Wallets funded with real USDC / USDT on the chains you'll actually use.
 - [ ] `fromAddress` declared on each account asset matches the wallet you'll actually broadcast from. **Mismatches lose funds with no refund.**
-- [ ] On-chain guard / pre-broadcast check (asset+chain, amount, fromAddress, toAddress) is wired up — not just in the example, but in the production code path.
+- [ ] Onchain guard / pre-broadcast check (asset+chain, amount, fromAddress, toAddress) is wired up — not just in the example, but in the production code path.
 
 ### Discovery and corridors
 

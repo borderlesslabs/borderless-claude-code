@@ -1,6 +1,6 @@
 # Withdrawal: USDC on Polygon → US ACH
 
-A minimal, runnable example of the Borderless withdrawal (off-ramp) flow in TypeScript. The client sends USDC on Polygon on-chain; USD lands in the destination bank account via ACH.
+A minimal, runnable example of the Borderless withdrawal (offramp) flow in TypeScript. The client sends USDC on Polygon onchain; USD lands in the destination bank account via ACH.
 
 ## What this covers
 
@@ -8,7 +8,7 @@ A minimal, runnable example of the Borderless withdrawal (off-ramp) flow in Type
 - Idempotency-key generation per logical operation.
 - Payment instruction creation (with env-var reuse once you've created one).
 - Withdrawal quote (estimate-only).
-- Withdrawal creation, capturing the on-chain instruction.
+- Withdrawal creation, capturing the onchain instruction.
 - `src/onchain-guard.ts` — the safety check that validates `fromAddress`, `amount`, `toAddress`, and asset+chain all match `withdrawalOnchainInstruction` **before** broadcasting. Any withdrawal code in your own app must call this.
 
 The example **stops short of actually broadcasting the stablecoin transfer**. Broadcasting requires access to a wallet's signing keys (Fireblocks, Utila, Dfns, your own Standalone key, etc.) which is out of scope here. The example's last step prints what a downstream broadcaster would send.
@@ -45,7 +45,7 @@ npm run withdrawal
 2. Create a payment instruction (or reuse one from `BORDERLESS_PAYMENT_INSTRUCTION_ID` if set).
 3. `GET /withdrawals/quotes` with the corridor + amount → estimate.
 4. `POST /withdrawals` with idempotency key and required `paymentPurpose`. Response includes `withdrawalOnchainInstruction` (`toAddress`, `fromAddress`, `amount`, `asset`) — **usually `null` at creation**; the example polls `GET /transactions/{id}` until it populates.
-5. Build the planned on-chain transfer from the account's `fromAddress` + declared amount + PFI's `toAddress` + corridor asset.
+5. Build the planned onchain transfer from the account's `fromAddress` + declared amount + PFI's `toAddress` + corridor asset.
 6. Call `assertWithdrawalOnchainMatch` — if anything mismatches, throw and stop.
 7. **(Stops here.)** In your real integration, hand the validated transfer to your wallet provider to sign and broadcast. Then poll `GET /transactions/{id}` or listen for `Transaction_Updated` until `status === 'Completed'`.
 

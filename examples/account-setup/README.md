@@ -4,7 +4,7 @@ A minimal, runnable example that creates a Standalone account for an existing id
 
 ## What this covers
 
-- `POST /accounts` with type Standalone — customer-managed wallet. The **customer provides the on-chain address** at create time; Borderless does not generate one.
+- `POST /accounts` with type Standalone — customer-managed wallet. The **customer provides the onchain address** at create time; Borderless does not generate one.
 - Reading back the per-asset address confirmation from the account response.
 - Reporting the identifiers the downstream examples need: `BORDERLESS_ACCOUNT_ID` and `BORDERLESS_FROM_ADDRESS`.
 
@@ -19,7 +19,7 @@ Standalone is Borderless's "bring your own wallet" account type. You tell Border
 - Node 20+.
 - A Borderless sandbox client ID and secret.
 - An identity that has passed compliance for your target corridor. See `../compliance-personal/`.
-- An on-chain address you control on the target chain (for `USDC_POLYGON`, that's any Polygon / EVM address). For sandbox, you can generate a throwaway:
+- An onchain address you control on the target chain (for `USDC_POLYGON`, that's any Polygon / EVM address). For sandbox, you can generate a throwaway:
   ```bash
   # If you have foundry:
   cast wallet new

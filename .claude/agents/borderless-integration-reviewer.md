@@ -37,7 +37,7 @@ Your job: given a diff, a set of files, or a pull request description, produce a
 5. **Amount handling (high).**
    - Native `Number` / `float` arithmetic on amount fields.
    - String amounts compared lexicographically rather than as decimals.
-   - Mixing units (natural vs. on-chain integer units).
+   - Mixing units (natural vs. onchain integer units).
 
 6. **Auth & environment (medium).**
    - Fetching a fresh access token on every API call.

@@ -1,9 +1,9 @@
 ---
 name: borderless-deposit-flow
-description: Use when building or debugging a Borderless deposit (on-ramp) flow — converting local fiat currency into stablecoins. Triggers on mentions of deposits, on-ramp, fiat-to-stablecoin, pay-in, or receiving funds via ACH, wire, PIX, SPEI, or other local rails in a Borderless context.
+description: Use when building or debugging a Borderless deposit (onramp) flow — converting local fiat currency into stablecoins. Triggers on mentions of deposits, onramp, fiat-to-stablecoin, pay-in, or receiving funds via ACH, wire, PIX, SPEI, or other local rails in a Borderless context.
 ---
 
-# Borderless Deposit Flow (On-Ramp)
+# Borderless Deposit Flow (Onramp)
 
 A deposit converts local fiat → stablecoin. The payment originator sends fiat via local rails (ACH, Wire, PIX, SPEI, etc.) to the PFI's bank account. The PFI then releases stablecoins to the account's wallet.
 
@@ -29,7 +29,7 @@ Returns an array of `{id, country, fiat, method, asset}` items (note: `method`, 
 
 **Options ≠ availability.** `/options` reflects configured ramp configs, including providers that are currently inactive on your org. Validate the corridor and asset against `GET /organizations/network?status=active` before building — full endpoint ladder in `cookbook/discovery.md`.
 
-**Deposits and withdrawals have separate PFI configurations.** A corridor that works for withdrawals on your org may not be enabled for deposits, and vice versa. If `/deposits` later fails with "Invalid provider" or "Failed to create deposit payment", the on-ramp side is not provisioned even though the corridor showed up — contact support.
+**Deposits and withdrawals have separate PFI configurations.** A corridor that works for withdrawals on your org may not be enabled for deposits, and vice versa. If `/deposits` later fails with "Invalid provider" or "Failed to create deposit payment", the onramp side is not provisioned even though the corridor showed up — contact support.
 
 `GET /deposits/institutions?country=&fiat=&paymentMethod=` exists with the same shape as the withdrawals variant (`{allInstitutionsSupported, institutionIdentifier, supportedInstitutions, country, fiat, paymentMethod}`). For most deposit corridors you don't need to call it — the originator sends fiat to bank details Borderless returns after submission. The exception is corridors where the deposit involves a `paymentInstructionId` (mobile money, some LATAM rails) — there you'll need a PI created in advance, and `/deposits/institutions` is the discovery for that PI.
 
@@ -117,7 +117,7 @@ This happens **outside Borderless** over the traditional fiat rail (ACH, Wire, F
 
 Once the PFI reconciles the incoming fiat, it releases stablecoin to the destination account's wallet address. The transaction progresses through the statuses in the table below — typically `Submitted` → `Verifying` → `Orchestrating` → `Pending` → `Processing` → `Completed`. Failures end in `Failed` with a `failureReason`.
 
-`txHash` on the transaction record is an **array of strings** (`txHash: string[]`) — not a single hash. It's empty at creation and populates after the PFI broadcasts on-chain; most flows end with one entry, but some (e.g., ERC-20 approve + transfer) add more than one.
+`txHash` on the transaction record is an **array of strings** (`txHash: string[]`) — not a single hash. It's empty at creation and populates after the PFI broadcasts onchain; most flows end with one entry, but some (e.g., ERC-20 approve + transfer) add more than one.
 
 ## Lifecycle summary
 

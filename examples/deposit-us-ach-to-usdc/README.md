@@ -1,6 +1,6 @@
 # Deposit: US ACH → USDC on Polygon
 
-A minimal, runnable example of the Borderless deposit (on-ramp) flow in TypeScript. The end user pays USD via ACH; USDC lands in their Polygon wallet.
+A minimal, runnable example of the Borderless deposit (onramp) flow in TypeScript. The end user pays USD via ACH; USDC lands in their Polygon wallet.
 
 ## What this covers
 

@@ -6,7 +6,7 @@ Corridors observed: **NG/NGN (BankTransfer)**, **ZA/ZAR (EFT)**, other African c
 
 ## Compliance behavior
 
-- **`PreApproved` for foreign business identities** — e.g. a US business off-ramping to NGN transacts with no additional documents.
+- **`PreApproved` for foreign business identities** — e.g. a US business offramping to NGN transacts with no additional documents.
 - **Local residents follow local KYC requirements:** an NG-resident *personal* identity requires **`BVN_NG`** (Bank Verification Number) and **`NationalId`** documents — the local regulatory standard. The `requirements` endpoint surfaces this per identity; query it per identity rather than generalizing from the business identity's requirements.
 
 ## Payment instruction notes
